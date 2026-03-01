@@ -72,7 +72,9 @@ function Favorites() {
       const api = item.media_type === 'video' ? videosApi : imagesApi
       await api.toggleFavorite(item.id)
       message.success('已取消收藏')
-      fetchFavorites()
+      // 直接从列表中移除该条目，不刷新整个列表
+      setFavorites(favorites.filter(f => f.id !== item.id))
+      setPagination({ ...pagination, total: pagination.total - 1 })
     } catch (error) {
       message.error('操作失败')
     }

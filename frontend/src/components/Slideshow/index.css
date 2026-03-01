@@ -1,0 +1,350 @@
+.slideshow-modal .ant-modal-content {
+  padding: 0;
+  height: 100vh;
+  background: #000;
+}
+
+.slideshow-modal .ant-modal-body {
+  height: 100%;
+  padding: 0;
+}
+
+.slideshow-modal .ant-modal-header,
+.slideshow-modal .ant-modal-footer,
+.slideshow-modal .ant-modal-close {
+  display: none;
+}
+
+.slideshow-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  position: relative;
+}
+
+.slideshow-container.fullscreen {
+  height: 100vh;
+}
+
+.slideshow-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  z-index: 100;
+}
+
+.slideshow-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.slideshow-title .ant-typography {
+  color: white;
+}
+
+.slideshow-counter {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px;
+}
+
+.slideshow-close-btn {
+  color: white;
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.slideshow-close-btn:hover {
+  color: #fb7299;
+  transform: scale(1.1);
+}
+
+.slideshow-image-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.slideshow-image-container {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 90%;
+  max-height: 80%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slideshow-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+}
+
+.slideshow-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fb7299;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.slideshow-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  font-size: 24px;
+  padding: 24px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.slideshow-nav-btn:hover {
+  background: rgba(251, 114, 153, 0.5);
+  color: white;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.slideshow-nav-btn.prev {
+  left: 24px;
+}
+
+.slideshow-nav-btn.next {
+  right: 24px;
+}
+
+.slideshow-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, transparent 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+}
+
+.controls-left,
+.controls-center,
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-btn {
+  min-width: 100px;
+}
+
+.slideshow-controls .ant-slider .ant-slider-track {
+  background: linear-gradient(90deg, #fb7299 0%, #ff9a9e 100%);
+}
+
+.slideshow-controls .ant-slider .ant-slider-handle {
+  border-color: #fb7299;
+  background: white;
+}
+
+.slideshow-controls .ant-switch {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.slideshow-controls .ant-switch-checked {
+  background: #fb7299;
+}
+
+.slideshow-controls .ant-typography {
+  color: white;
+}
+
+.slideshow-controls .ant-btn {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.slideshow-controls .ant-btn:hover {
+  border-color: #fb7299;
+  color: #fb7299;
+}
+
+.slideshow-controls .ant-btn:disabled {
+  opacity: 0.5;
+}
+
+.slideshow-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #fb7299 0%, #ff9a9e 100%);
+  transition: width 0.3s ease;
+}
+
+/* Tablet */
+@media (max-width: 992px) {
+  .slideshow-controls {
+    padding: 16px;
+  }
+  
+  .controls-center {
+    display: none;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .slideshow-header {
+    height: 56px;
+    padding: 0 16px;
+  }
+  
+  .slideshow-title {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .slideshow-title .ant-typography {
+    font-size: 13px;
+  }
+  
+  .slideshow-counter {
+    font-size: 12px;
+  }
+  
+  .slideshow-close-btn {
+    font-size: 18px;
+    padding: 8px;
+  }
+  
+  .slideshow-image-container {
+    max-width: 95%;
+    max-height: 75%;
+  }
+  
+  .slideshow-image {
+    max-height: 75vh;
+  }
+  
+  .slideshow-nav-btn {
+    padding: 16px 12px;
+    font-size: 20px;
+  }
+  
+  .slideshow-nav-btn.prev {
+    left: 12px;
+  }
+  
+  .slideshow-nav-btn.next {
+    right: 12px;
+  }
+  
+  .slideshow-controls {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  .controls-left,
+  .controls-center,
+  .controls-right {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .controls-center {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .controls-center .ant-space {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .slideshow-controls .ant-slider {
+    width: 150px !important;
+  }
+  
+  .control-btn {
+    min-width: 80px;
+    font-size: 13px;
+  }
+  
+  .slideshow-controls .ant-btn {
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 375px) {
+  .slideshow-title .ant-typography {
+    font-size: 12px;
+  }
+  
+  .slideshow-controls .ant-slider {
+    width: 120px !important;
+  }
+  
+  .control-btn {
+    min-width: 70px;
+    font-size: 12px;
+  }
+}
+
+/* Touch-friendly */
+@media (hover: none) and (pointer: coarse) {
+  .slideshow-nav-btn {
+    min-width: 56px;
+    min-height: 56px;
+  }
+  
+  .slideshow-controls .ant-btn {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  .slideshow-controls .ant-switch {
+    transform: scale(1.1);
+  }
+}

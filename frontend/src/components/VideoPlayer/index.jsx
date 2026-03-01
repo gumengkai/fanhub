@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Slider, Tooltip } from 'antd'
+import { Slider, Tooltip, Select } from 'antd'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -9,11 +9,19 @@ import {
   MutedOutlined,
   BackwardOutlined,
   ForwardOutlined,
-  SettingOutlined,
 } from '@ant-design/icons'
 import './index.css'
 
-function VideoPlayer({ video }) {
+// Custom PiP icon since PictureInPictureOutlined is not available
+const PictureInPictureIcon = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+    <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/>
+  </svg>
+)
+
+const { Option } = Select
+
+function VideoPlayer({ video, onProgressUpdate }) {
   const videoRef = useRef(null)
   const containerRef = useRef(null)
   const [loading, setLoading] = useState(true)
@@ -25,20 +33,48 @@ function VideoPlayer({ video }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [playbackRate, setPlaybackRate] = useState(1)
+  const [showPiP, setShowPiP] = useState(false)
   const controlsTimeoutRef = useRef(null)
+  const saveProgressRef = useRef(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  // Load saved progress
+  useEffect(() => {
+    if (video?.id) {
+      fetch(`/api/videos/${video.id}/history`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.playback_position && data.playback_position > 0 && data.playback_position < duration * 0.95) {
+            setCurrentTime(data.playback_position)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [video?.id])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime)
+    const handleTimeUpdate = () => {
+      if (!isDragging) {
+        setCurrentTime(video.currentTime)
+      }
+      if (Math.floor(video.currentTime) % 10 === 0) {
+        saveProgress(video.currentTime, video.duration)
+      }
+    }
+    
     const handleLoadedMetadata = () => {
       setDuration(video.duration)
       setLoading(false)
     }
     const handlePlay = () => setIsPlaying(true)
     const handlePause = () => setIsPlaying(false)
-    const handleEnded = () => setIsPlaying(false)
+    const handleEnded = () => {
+      setIsPlaying(false)
+      saveProgress(video.duration, video.duration, true)
+    }
     const handleWaiting = () => setLoading(true)
     const handleCanPlay = () => setLoading(false)
 
@@ -59,68 +95,70 @@ function VideoPlayer({ video }) {
       video.removeEventListener('waiting', handleWaiting)
       video.removeEventListener('canplay', handleCanPlay)
     }
-  }, [])
+  }, [isDragging])
 
-  // Auto-hide controls
+  const saveProgress = (position, totalDuration, completed = false) => {
+    if (saveProgressRef.current) clearTimeout(saveProgressRef.current)
+    saveProgressRef.current = setTimeout(() => {
+      if (video?.id && onProgressUpdate) {
+        onProgressUpdate(video.id, position, totalDuration, completed)
+      }
+    }, 500)
+  }
+
   useEffect(() => {
     const handleMouseMove = () => {
       setShowControls(true)
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current)
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+      if (isPlaying) {
+        controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000)
       }
-      controlsTimeoutRef.current = setTimeout(() => {
-        if (isPlaying) {
-          setShowControls(false)
-        }
-      }, 3000)
     }
 
     const container = containerRef.current
     if (container) {
       container.addEventListener('mousemove', handleMouseMove)
-      container.addEventListener('mouseleave', () => {
-        if (isPlaying) setShowControls(false)
-      })
+      container.addEventListener('mouseleave', () => isPlaying && setShowControls(false))
       container.addEventListener('mouseenter', () => setShowControls(true))
     }
 
     return () => {
-      if (container) {
-        container.removeEventListener('mousemove', handleMouseMove)
-      }
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current)
-      }
+      if (container) container.removeEventListener('mousemove', handleMouseMove)
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
     }
   }, [isPlaying])
 
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause()
-      } else {
-        videoRef.current.play()
-      }
-    }
-  }
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
-  const handleSeek = (value) => {
+  useEffect(() => {
+    setShowPiP('pictureInPictureEnabled' in document)
+  }, [])
+
+  const togglePlay = () => {
     if (videoRef.current) {
-      videoRef.current.currentTime = value
-      setCurrentTime(value)
+      if (isPlaying) videoRef.current.pause()
+      else videoRef.current.play()
     }
   }
 
   const handleSeekChange = (value) => {
-    // While dragging, just update the display
     setCurrentTime(value)
   }
 
   const handleSeekAfterChange = (value) => {
-    // After drag ends, actually seek
     if (videoRef.current) {
       videoRef.current.currentTime = value
+      saveProgress(value, duration)
     }
+    setIsDragging(false)
+  }
+
+  const handleSeekBeforeChange = () => {
+    setIsDragging(true)
   }
 
   const handleVolumeChange = (value) => {
@@ -131,7 +169,7 @@ function VideoPlayer({ video }) {
     }
   }
 
-  const handleMuteToggle = () => {
+  const toggleMute = () => {
     if (videoRef.current) {
       const newMuted = !isMuted
       videoRef.current.muted = newMuted
@@ -139,23 +177,34 @@ function VideoPlayer({ video }) {
     }
   }
 
-  const handleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen()
-      setIsFullscreen(true)
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement && containerRef.current) {
+      try {
+        await containerRef.current.requestFullscreen()
+        setIsFullscreen(true)
+      } catch (err) { console.error('Fullscreen error:', err) }
     } else {
-      document.exitFullscreen()
-      setIsFullscreen(false)
+      try {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      } catch (err) { console.error('Exit fullscreen error:', err) }
     }
   }
 
-  const handlePlaybackRateChange = () => {
+  const togglePlaybackRate = () => {
     const rates = [0.5, 0.75, 1, 1.25, 1.5, 2]
     const currentIndex = rates.indexOf(playbackRate)
     const nextRate = rates[(currentIndex + 1) % rates.length]
     setPlaybackRate(nextRate)
+    if (videoRef.current) videoRef.current.playbackRate = nextRate
+  }
+
+  const togglePiP = async () => {
     if (videoRef.current) {
-      videoRef.current.playbackRate = nextRate
+      try {
+        if (document.pictureInPictureElement) await document.exitPictureInPicture()
+        else await videoRef.current.requestPictureInPicture()
+      } catch (error) { console.error('PiP error:', error) }
     }
   }
 
@@ -164,9 +213,7 @@ function VideoPlayer({ video }) {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     const hours = Math.floor(mins / 60)
-    if (hours > 0) {
-      return `${hours}:${(mins % 60).toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    }
+    if (hours > 0) return `${hours}:${(mins % 60).toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
@@ -175,21 +222,14 @@ function VideoPlayer({ video }) {
       const newTime = Math.max(0, Math.min(duration, currentTime + seconds))
       videoRef.current.currentTime = newTime
       setCurrentTime(newTime)
+      saveProgress(newTime, duration)
     }
   }
 
-  const handleVideoClick = (e) => {
-    // Don't pause if clicking on controls
-    if (e.target === videoRef.current) {
-      handlePlayPause()
-    }
-  }
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
-    <div
-      ref={containerRef}
-      className={`video-player-container ${isFullscreen ? 'fullscreen' : ''}`}
-    >
+    <div ref={containerRef} className={`video-player-container ${isFullscreen ? 'fullscreen' : ''}`} data-video-id={video?.id}>
       {loading && (
         <div className="video-loading-overlay">
           <div className="loading-spinner" />
@@ -200,28 +240,29 @@ function VideoPlayer({ video }) {
         ref={videoRef}
         className="video-element"
         src={video ? `/api/videos/${video.id}/stream` : ''}
-        onClick={handleVideoClick}
+        onClick={togglePlay}
         controls={false}
         preload="metadata"
       />
 
-      {/* Big play button when paused */}
       {!isPlaying && !loading && (
-        <div className="big-play-button" onClick={handlePlayPause}>
+        <div className="big-play-button" onClick={togglePlay}>
           <PlayCircleOutlined />
         </div>
       )}
 
-      {/* Controls */}
       <div className={`video-controls ${showControls ? 'visible' : 'hidden'}`}>
-        {/* Progress bar */}
         <div className="progress-bar-container">
+          <div className="progress-background">
+            <div className="progress-buffered" style={{ width: `${progressPercent}%` }} />
+          </div>
           <Slider
             className="progress-slider"
             value={currentTime}
             max={duration || 100}
             onChange={handleSeekChange}
             onChangeComplete={handleSeekAfterChange}
+            onBeforeChange={handleSeekBeforeChange}
             tooltip={{ formatter: formatTime }}
             step={1}
           />
@@ -229,42 +270,37 @@ function VideoPlayer({ video }) {
 
         <div className="controls-bar">
           <div className="controls-left">
-            <button className="control-btn" onClick={handlePlayPause}>
+            <button className="control-btn" onClick={togglePlay}>
               {isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
             </button>
-
             <button className="control-btn" onClick={() => skip(-10)}>
               <BackwardOutlined />
             </button>
-
             <button className="control-btn" onClick={() => skip(10)}>
               <ForwardOutlined />
             </button>
-
             <div className="volume-control">
-              <button className="control-btn" onClick={handleMuteToggle}>
+              <button className="control-btn" onClick={toggleMute}>
                 {isMuted ? <MutedOutlined /> : <SoundOutlined />}
               </button>
-              <Slider
-                className="volume-slider"
-                value={isMuted ? 0 : volume}
-                max={1}
-                step={0.1}
-                onChange={handleVolumeChange}
-              />
+              <Slider className="volume-slider" value={isMuted ? 0 : volume} max={1} step={0.1} onChange={handleVolumeChange} />
             </div>
-
-            <span className="time-display">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
+            <span className="time-display">{formatTime(currentTime)} / {formatTime(duration)}</span>
           </div>
 
           <div className="controls-right">
-            <button className="control-btn playback-rate" onClick={handlePlaybackRateChange}>
+            <button className="control-btn playback-rate" onClick={togglePlaybackRate}>
               {playbackRate}x
             </button>
-
-            <button className="control-btn" onClick={handleFullscreen}>
+            {showPiP && (
+              <button className="control-btn" onClick={togglePiP} title="画中画">
+                <svg viewBox="0 0 1024 1024" width="1em" height="1em" fill="currentColor">
+                  <path d="M912 100H112c-6.6 0-12 5.4-12 12v800c0 6.6 5.4 12 12 12h800c6.6 0 12-5.4 12-12V112c0-6.6-5.4-12-12-12z m-12 800H124V124h776v776z"/>
+                  <path d="M560 432h288c6.6 0 12-5.4 12-12V224c0-6.6-5.4-12-12-12H560c-6.6 0-12 5.4-12 12v196c0 6.6 5.4 12 12 12z"/>
+                </svg>
+              </button>
+            )}
+            <button className="control-btn" onClick={toggleFullscreen}>
               {isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
             </button>
           </div>

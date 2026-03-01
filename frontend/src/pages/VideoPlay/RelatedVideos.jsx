@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { Card, List, Typography, Tag, Spin, Empty } from 'antd'
-import { VideoCameraOutlined, TagsOutlined } from '@ant-design/icons'
+import { Card, List, Typography, Tag, Spin, Empty, Space } from 'antd'
+import { VideoCameraOutlined, EyeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { videosApi } from '@services/api'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
-function RelatedVideos({ videoId }) {
+function RelatedVideos({ videoId, currentVideo }) {
   const navigate = useNavigate()
   const [relatedVideos, setRelatedVideos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -45,69 +45,58 @@ function RelatedVideos({ videoId }) {
 
   return (
     <Card
-      title={
-        <span>
-          <TagsOutlined style={{ marginRight: 8 }} />
-          相关推荐
-        </span>
-      }
+      title="相关推荐"
       className="related-videos-card"
+      size="small"
     >
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
           <Spin size="small" />
         </div>
       ) : relatedVideos.length === 0 ? (
         <Empty description="暂无相关视频" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
-        <List
-          itemLayout="horizontal"
-          dataSource={relatedVideos}
-          renderItem={(video) => (
-            <List.Item
+        <div className="related-videos-list">
+          {relatedVideos.map((video) => (
+            <div
+              key={video.id}
               className="related-video-item"
               onClick={() => handleVideoClick(video.id)}
-              style={{ cursor: 'pointer' }}
             >
-              <List.Item.Meta
-                avatar={
-                  <div className="related-video-thumbnail">
-                    {video.thumbnail_path ? (
-                      <img
-                        src={`/api/videos/${video.id}/thumbnail`}
-                        alt={video.title}
-                      />
-                    ) : (
-                      <div className="thumbnail-placeholder">
-                        <VideoCameraOutlined />
-                      </div>
-                    )}
-                    <span className="duration-badge">
-                      {formatDuration(video.duration)}
-                    </span>
+              <div className="related-video-thumb">
+                {video.thumbnail_path ? (
+                  <img
+                    src={`/api/videos/${video.id}/thumbnail`}
+                    alt={video.title}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="thumbnail-placeholder">
+                    <VideoCameraOutlined />
                   </div>
-                }
-                title={
-                  <Text ellipsis style={{ maxWidth: 200 }}>
-                    {video.title}
-                  </Text>
-                }
-                description={
-                  <Space size="small" wrap>
-                    {video.tags?.slice(0, 2).map((tag) => (
-                      <Tag key={tag.id} color={tag.color} size="small">
-                        {tag.name}
-                      </Tag>
-                    ))}
-                    {video.tags?.length > 2 && (
-                      <Tag size="small">+{video.tags.length - 2}</Tag>
-                    )}
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
-        />
+                )}
+                <span className="duration-badge">
+                  {formatDuration(video.duration)}
+                </span>
+              </div>
+              <div className="related-video-info">
+                <div className="related-video-title">{video.title}</div>
+                <div className="related-video-meta">
+                  <span><EyeOutlined /> {video.view_count || 0}</span>
+                  {video.tags?.length > 0 && (
+                    <Tag 
+                      color={video.tags[0].color || '#fb7299'} 
+                      size="small"
+                      style={{ marginLeft: 'auto' }}
+                    >
+                      {video.tags[0].name}
+                    </Tag>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </Card>
   )

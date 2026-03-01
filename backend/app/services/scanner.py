@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from ..models import db, Video, Image, Source
-from ..services.thumbnail import generate_video_thumbnail, generate_image_thumbnail
 
 # Supported file extensions
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.webm'}
@@ -19,22 +18,28 @@ def scan_source(source):
     }
 
     if source.type == 'local':
-        scan_local_directory(source, stats)
+        # Scan based on media_type
+        if source.media_type in ('all', 'video'):
+            scan_local_directory(source, stats, 'video')
+        if source.media_type in ('all', 'image'):
+            scan_local_directory(source, stats, 'image')
     elif source.type == 'nas':
         scan_nas_directory(source, stats)
 
     return stats
 
 
-def scan_local_directory(source, stats):
+def scan_local_directory(source, stats, media_type='all'):
     """Scan a local directory for media files."""
     if not os.path.exists(source.path):
         stats['errors'].append(f"Path does not exist: {source.path}")
         return
 
     # Get existing files to track deletions
-    existing_videos = {v.path: v for v in Video.query.filter_by(source_id=source.id).all()}
-    existing_images = {i.path: i for i in Image.query.filter_by(source_id=source.id).all()}
+    if media_type in ('all', 'video'):
+        existing_videos = {v.path: v for v in Video.query.filter_by(source_id=source.id).all()}
+    if media_type in ('all', 'image'):
+        existing_images = {i.path: i for i in Image.query.filter_by(source_id=source.id).all()}
 
     scanned_paths = set()
 
@@ -51,10 +56,10 @@ def scan_local_directory(source, stats):
 
             ext = os.path.splitext(filename)[1].lower()
 
-            if ext in VIDEO_EXTENSIONS:
-                process_video_file(file_path, source, existing_videos, stats)
-            elif ext in IMAGE_EXTENSIONS:
-                process_image_file(file_path, source, existing_images, stats)
+            if media_type in ('all', 'video') and ext in VIDEO_EXTENSIONS:
+                process_video_file(file_path, source, existing_videos if media_type != 'video' else {}, stats)
+            elif media_type in ('all', 'image') and ext in IMAGE_EXTENSIONS:
+                process_image_file(file_path, source, existing_images if media_type != 'image' else {}, stats)
 
     # Mark missing files (optional - could also delete them)
     # For now, we keep them in the database but could add a 'missing' flag
@@ -86,14 +91,7 @@ def process_video_file(file_path, source, existing_videos, stats):
             # Extract video info
             video_info = get_video_info(file_path)
 
-            # Generate thumbnail
-            thumbnail_path = None
-            try:
-                thumbnail_path = generate_video_thumbnail(file_path, None)
-            except Exception as e:
-                print(f"Failed to generate thumbnail for {file_path}: {e}")
-
-            # Create new video record
+            # Create new video record first (to get ID)
             video = Video(
                 title=os.path.splitext(os.path.basename(file_path))[0],
                 path=file_path,
@@ -102,10 +100,22 @@ def process_video_file(file_path, source, existing_videos, stats):
                 duration=video_info.get('duration'),
                 width=video_info.get('width'),
                 height=video_info.get('height'),
-                thumbnail_path=thumbnail_path,
+                thumbnail_path=None,
                 is_favorite=False
             )
             db.session.add(video)
+            db.session.commit()  # Commit to get the ID
+
+            # Generate thumbnail with the video ID
+            thumbnail_path = None
+            try:
+                from ..services.thumbnail import generate_video_thumbnail
+                thumbnail_path = generate_video_thumbnail(file_path, video.id)
+                video.thumbnail_path = thumbnail_path
+                db.session.commit()
+            except Exception as e:
+                print(f"Failed to generate thumbnail for {file_path}: {e}")
+
             stats['videos_added'] += 1
 
         db.session.commit()
@@ -132,14 +142,7 @@ def process_image_file(file_path, source, existing_images, stats):
             # Get image dimensions
             image_info = get_image_info(file_path)
 
-            # Generate thumbnail
-            thumbnail_path = None
-            try:
-                thumbnail_path = generate_image_thumbnail(file_path, None)
-            except Exception as e:
-                print(f"Failed to generate thumbnail for {file_path}: {e}")
-
-            # Create new image record
+            # Create new image record first (to get ID)
             image = Image(
                 title=os.path.splitext(os.path.basename(file_path))[0],
                 path=file_path,
@@ -147,10 +150,22 @@ def process_image_file(file_path, source, existing_images, stats):
                 file_size=file_size,
                 width=image_info.get('width'),
                 height=image_info.get('height'),
-                thumbnail_path=thumbnail_path,
+                thumbnail_path=None,
                 is_favorite=False
             )
             db.session.add(image)
+            db.session.commit()  # Commit to get the ID
+
+            # Generate thumbnail with the image ID
+            thumbnail_path = None
+            try:
+                from ..services.thumbnail import generate_image_thumbnail
+                thumbnail_path = generate_image_thumbnail(file_path, image.id)
+                image.thumbnail_path = thumbnail_path
+                db.session.commit()
+            except Exception as e:
+                print(f"Failed to generate thumbnail for {file_path}: {e}")
+
             stats['images_added'] += 1
 
         db.session.commit()
@@ -166,6 +181,12 @@ def get_video_info(file_path):
     try:
         import subprocess
         import json
+        import shutil
+
+        # Check if ffprobe is available
+        if not shutil.which('ffprobe'):
+            print(f"⚠️  ffprobe not found. Please install ffmpeg to get video metadata.")
+            return info
 
         cmd = [
             'ffprobe',

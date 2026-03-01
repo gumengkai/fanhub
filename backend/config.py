@@ -11,8 +11,8 @@ class Config:
         f'sqlite:///{PROJECT_DIR}/storage/database/funhub.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    THUMBNAIL_DIR = PROJECT_DIR / 'storage' / 'thumbnails'
-    THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
+    THUMBNAIL_FOLDER = PROJECT_DIR / 'storage' / 'thumbnails'
+    THUMBNAIL_FOLDER.mkdir(parents=True, exist_ok=True)
 
     VIDEO_EXTENSIONS = {'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'}
     IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'svg'}

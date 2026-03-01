@@ -70,11 +70,15 @@ def get_image_file(image_id):
     }
     mimetype = mimetype_map.get(ext, 'application/octet-stream')
 
-    return send_file(
+    response = send_file(
         image.path,
         mimetype=mimetype,
         as_attachment=False
     )
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @images_bp.route('/<int:image_id>/thumbnail', methods=['GET'])
@@ -83,22 +87,30 @@ def get_image_thumbnail(image_id):
     image = Image.query.get_or_404(image_id)
 
     if image.thumbnail_path and os.path.exists(image.thumbnail_path):
-        return send_file(
+        response = send_file(
             image.thumbnail_path,
             mimetype='image/jpeg',
             as_attachment=False
         )
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
 
     # Generate thumbnail if not exists
     try:
         thumbnail_path = generate_image_thumbnail(image.path, image.id)
         image.thumbnail_path = thumbnail_path
         db.session.commit()
-        return send_file(
+        response = send_file(
             thumbnail_path,
             mimetype='image/jpeg',
             as_attachment=False
         )
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -132,3 +144,70 @@ def toggle_favorite(image_id):
         'message': 'Favorite status updated',
         'is_favorite': image.is_favorite
     })
+
+
+@images_bp.route('/batch', methods=['DELETE'])
+def batch_delete_images():
+    """Delete multiple images."""
+    data = request.get_json()
+    image_ids = data.get('image_ids', [])
+
+    if not image_ids:
+        return jsonify({'error': 'image_ids is required'}), 400
+
+    deleted = 0
+    failed = 0
+    errors = []
+
+    for image_id in image_ids:
+        try:
+            image = Image.query.get(image_id)
+            if image:
+                # Delete thumbnail if exists
+                if image.thumbnail_path and os.path.exists(image.thumbnail_path):
+                    try:
+                        os.remove(image.thumbnail_path)
+                    except OSError:
+                        pass
+
+                db.session.delete(image)
+                deleted += 1
+            else:
+                failed += 1
+                errors.append({'id': image_id, 'error': 'Image not found'})
+        except Exception as e:
+            failed += 1
+            errors.append({'id': image_id, 'error': str(e)[:200]})
+
+    db.session.commit()
+
+    return jsonify({
+        'message': f'Deleted {deleted} images, {failed} failed',
+        'deleted': deleted,
+        'failed': failed,
+        'errors': errors
+    })
+
+
+@images_bp.route('/all', methods=['GET'])
+def get_all_images():
+    """Get all images for slideshow (no pagination)."""
+    search = request.args.get('search', '')
+    source_id = request.args.get('source_id', type=int)
+    favorite = request.args.get('favorite', type=int)
+    limit = request.args.get('limit', 500, type=int)
+
+    query = Image.query
+
+    if search:
+        query = query.filter(Image.title.ilike(f'%{search}%'))
+
+    if source_id:
+        query = query.filter(Image.source_id == source_id)
+
+    if favorite is not None:
+        query = query.filter(Image.is_favorite == bool(favorite))
+
+    images = query.order_by(Image.created_at).limit(limit).all()
+
+    return jsonify([image.to_dict() for image in images])

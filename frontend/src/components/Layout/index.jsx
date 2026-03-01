@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Layout, Menu, Input, Badge, Avatar, Space, Dropdown, theme } from 'antd'
+import { Layout, Menu, Input, Space, theme, Button, Drawer, Tabs, Dropdown } from 'antd'
 import {
   HomeOutlined,
   VideoCameraOutlined,
@@ -7,64 +7,36 @@ import {
   SettingOutlined,
   HeartOutlined,
   SearchOutlined,
+  PlayCircleOutlined,
+  MenuOutlined,
+  CloseOutlined,
   UserOutlined,
-  BellOutlined,
-  DownOutlined,
 } from '@ant-design/icons'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './index.css'
 
-const { Header, Sider, Content } = Layout
+const { Header, Content } = Layout
 const { Search } = Input
 
-const menuItems = [
-  {
-    key: '/',
-    icon: <HomeOutlined />,
-    label: <Link to="/">首页</Link>,
-  },
-  {
-    key: '/videos',
-    icon: <VideoCameraOutlined />,
-    label: <Link to="/videos">视频库</Link>,
-  },
-  {
-    key: '/images',
-    icon: <PictureOutlined />,
-    label: <Link to="/images">图片库</Link>,
-  },
-  {
-    key: '/favorites',
-    icon: <HeartOutlined />,
-    label: <Link to="/favorites">收藏</Link>,
-  },
-  {
-    key: '/sources',
-    icon: <SettingOutlined />,
-    label: <Link to="/sources">来源配置</Link>,
-  },
+const navItems = [
+  { key: '/', icon: <HomeOutlined />, label: '首页', path: '/' },
+  { key: '/videos', icon: <VideoCameraOutlined />, label: '视频库', path: '/videos' },
+  { key: '/short-video', icon: <PlayCircleOutlined />, label: '短视频', path: '/short-video' },
+  { key: '/images', icon: <PictureOutlined />, label: '图片库', path: '/images' },
+  { key: '/favorites', icon: <HeartOutlined />, label: '收藏', path: '/favorites' },
 ]
 
-const userMenuItems = [
-  {
-    key: 'profile',
-    label: '个人资料',
-  },
-  {
-    key: 'settings',
-    label: '设置',
-  },
-  {
-    type: 'divider',
-  },
-  {
-    key: 'logout',
-    label: '退出登录',
-  },
+const mobileNavItems = [
+  { key: '/', icon: <HomeOutlined />, label: '首页', path: '/' },
+  { key: '/videos', icon: <VideoCameraOutlined />, label: '视频', path: '/videos' },
+  { key: '/short-video', icon: <PlayCircleOutlined />, label: '短视频', path: '/short-video' },
+  { key: '/images', icon: <PictureOutlined />, label: '图片', path: '/images' },
+  { key: '/favorites', icon: <HeartOutlined />, label: '收藏', path: '/favorites' },
 ]
 
 function AppLayout({ children }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [mobileMenuVisible, setMobileMenuVisible] = useState(false)
+  const [searchVisible, setSearchVisible] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const {
@@ -73,85 +45,156 @@ function AppLayout({ children }) {
 
   const handleSearch = (value) => {
     if (value.trim()) {
-      const currentPath = location.pathname
-      if (currentPath === '/images') {
+      if (location.pathname === '/images') {
         navigate(`/images?search=${encodeURIComponent(value)}`)
       } else {
         navigate(`/videos?search=${encodeURIComponent(value)}`)
       }
     }
+    setSearchVisible(false)
   }
+
+  const handleMobileNavClick = (path) => {
+    navigate(path)
+  }
+
+  const handleTabChange = (key) => {
+    navigate(key)
+  }
+
+  const settingsMenuItems = [
+    {
+      key: 'sources',
+      icon: <SettingOutlined />,
+      label: '来源设置',
+      onClick: () => navigate('/sources'),
+    },
+  ]
 
   return (
     <Layout className="app-layout">
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        theme="dark"
-        className="app-sider"
-      >
-        <div className="logo">
+      <Header className="app-header">
+        {/* Logo */}
+        <div className="header-logo">
           <VideoCameraOutlined className="logo-icon" />
-          {!collapsed && <span className="logo-text">FunHub</span>}
+          <span className="logo-text">FunHub</span>
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          className="app-menu"
-        />
-      </Sider>
-      <Layout>
-        <Header
-          style={{
-            padding: '0 24px',
-            background: colorBgContainer,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div className="header-search">
+
+        {/* Top Navigation Tabs */}
+        <div className="header-nav">
+          <Tabs
+            activeKey={location.pathname}
+            items={navItems.map(item => ({
+              key: item.path,
+              label: item.label,
+              icon: item.icon,
+            }))}
+            onChange={handleTabChange}
+            className="top-tabs"
+          />
+        </div>
+
+        {/* Right Actions */}
+        <div className="header-actions">
+          {/* Search Popup */}
+          <div className={`search-popup ${searchVisible ? 'visible' : ''}`}>
             <Search
               placeholder="搜索视频或图片..."
               allowClear
               enterButton={<SearchOutlined />}
               size="middle"
               onSearch={handleSearch}
-              style={{ width: 400 }}
+              autoFocus={searchVisible}
+              onBlur={() => setSearchVisible(false)}
             />
           </div>
-          <Space size={24}>
-            <Badge count={5} size="small">
-              <BellOutlined style={{ fontSize: 20, cursor: 'pointer' }} />
-            </Badge>
-            <Dropdown
-              menu={{ items: userMenuItems }}
-              placement="bottomRight"
+          <Button
+            type="text"
+            icon={<SearchOutlined />}
+            className="search-trigger"
+            onClick={() => setSearchVisible(true)}
+          />
+
+          {/* Settings Dropdown */}
+          <Dropdown
+            menu={{ items: settingsMenuItems }}
+            placement="bottomRight"
+            arrow
+          >
+            <Button type="text" icon={<UserOutlined />} className="settings-btn" />
+          </Dropdown>
+
+          {/* Mobile Menu Toggle */}
+          <Button
+            type="text"
+            icon={<MenuOutlined />}
+            className="mobile-menu-toggle"
+            onClick={() => setMobileMenuVisible(true)}
+          />
+        </div>
+      </Header>
+
+      <Content
+        className="app-content"
+        style={{
+          background: colorBgContainer,
+          borderRadius: borderRadiusLG,
+        }}
+      >
+        {children}
+      </Content>
+
+      {/* Mobile Navigation */}
+      <nav className="mobile-nav">
+        <ul className="mobile-nav-menu">
+          {mobileNavItems.map((item) => (
+            <li
+              key={item.key}
+              className={`mobile-nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => handleMobileNavClick(item.path)}
             >
-              <Space style={{ cursor: 'pointer' }}>
-                <Avatar icon={<UserOutlined />} />
-                <span>管理员</span>
-                <DownOutlined />
-              </Space>
-            </Dropdown>
+              {item.icon}
+              <span>{item.label}</span>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Mobile Menu Drawer */}
+      <Drawer
+        placement="right"
+        onClose={() => setMobileMenuVisible(false)}
+        open={mobileMenuVisible}
+        width={280}
+        styles={{ body: { padding: 0 } }}
+      >
+        <div className="mobile-drawer-header">
+          <Space>
+            <VideoCameraOutlined className="drawer-icon" />
+            <span className="drawer-title">FunHub</span>
           </Space>
-        </Header>
-        <Content
-          style={{
-            margin: '24px 16px',
-            padding: 24,
-            minHeight: 280,
-            background: colorBgContainer,
-            borderRadius: borderRadiusLG,
-            overflow: 'auto',
-          }}
-        >
-          {children}
-        </Content>
-      </Layout>
+          <CloseOutlined
+            className="drawer-close"
+            onClick={() => setMobileMenuVisible(false)}
+          />
+        </div>
+        <Menu
+          mode="vertical"
+          selectedKeys={[location.pathname]}
+          items={[
+            ...navItems.map(item => ({
+              ...item,
+              label: <Link to={item.path}>{item.label}</Link>,
+            })),
+            {
+              key: '/sources',
+              icon: <SettingOutlined />,
+              label: <Link to="/sources">来源设置</Link>,
+            },
+          ]}
+          onClick={() => setMobileMenuVisible(false)}
+        />
+      </Drawer>
     </Layout>
   )
 }

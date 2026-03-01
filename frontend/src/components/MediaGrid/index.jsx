@@ -1,5 +1,5 @@
 import React from 'react'
-import { Row, Col, Empty, Pagination, Skeleton } from 'antd'
+import { Row, Col, Empty, Pagination, Skeleton, Checkbox } from 'antd'
 import MediaCard from '@components/MediaCard'
 import './index.css'
 
@@ -11,6 +11,10 @@ function MediaGrid({
   onFavorite,
   onItemClick,
   onDelete,
+  onPreview,
+  selectMode = false,
+  selectedIds = [],
+  onSelect,
 }) {
   if (loading) {
     return (
@@ -39,13 +43,25 @@ function MediaGrid({
       <Row gutter={[16, 16]}>
         {items.map((item) => (
           <Col xs={24} sm={12} md={8} lg={6} xl={4} key={item.id}>
-            <MediaCard
-              item={item}
-              type={type}
-              onFavorite={onFavorite}
-              onClick={() => onItemClick?.(item)}
-              onDelete={onDelete}
-            />
+            <div className={`media-grid-item ${selectMode ? 'select-mode' : ''} ${selectedIds.includes(item.id) ? 'selected' : ''}`}>
+              {selectMode && (
+                <div className="select-overlay" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.includes(item.id)}
+                    onChange={(e) => onSelect?.(item.id, e.target.checked)}
+                  />
+                </div>
+              )}
+              <MediaCard
+                key={item.id}
+                item={item}
+                type={type}
+                onFavorite={onFavorite}
+                onClick={() => onItemClick?.(item)}
+                onPreview={() => onPreview?.(item)}
+                onDelete={onDelete}
+              />
+            </div>
           </Col>
         ))}
       </Row>

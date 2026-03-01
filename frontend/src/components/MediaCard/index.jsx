@@ -1,5 +1,5 @@
-import React from 'react'
-import { Card, Badge, Tooltip, Button, Space } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Card, Badge, Tooltip, Button, Space, Checkbox } from 'antd'
 import {
   HeartOutlined,
   HeartFilled,
@@ -7,12 +7,29 @@ import {
   ClockCircleOutlined,
   VideoCameraOutlined,
   PictureOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import './index.css'
 
-function MediaCard({ item, type, onFavorite, onClick, onDelete }) {
+function MediaCard({
+  item,
+  type,
+  onFavorite,
+  onClick,
+  onPreview,
+  onDelete,
+  selectMode = false,
+  selected = false,
+  onSelect,
+}) {
   const isVideo = type === 'video'
   const Icon = isVideo ? VideoCameraOutlined : PictureOutlined
+  const [thumbnailError, setThumbnailError] = useState(false)
+
+  // Reset thumbnail error when item changes
+  useEffect(() => {
+    setThumbnailError(false)
+  }, [item.id])
 
   const formatDuration = (seconds) => {
     if (!seconds) return '--:--'
@@ -39,22 +56,47 @@ function MediaCard({ item, type, onFavorite, onClick, onDelete }) {
   }
 
   const thumbnailUrl = isVideo
-    ? item.thumbnail_path
-      ? `/api/videos/${item.id}/thumbnail`
-      : null
-    : `/api/images/${item.id}/thumbnail`
+    ? `/api/videos/${item.id}/thumbnail?t=${item.updated_at || item.id}`
+    : `/api/images/${item.id}/thumbnail?t=${item.updated_at || item.id}`
+
+  const handleClick = (e) => {
+    if (selectMode) {
+      e.preventDefault()
+      e.stopPropagation()
+      onSelect?.(item.id, !selected)
+    } else {
+      onClick?.(e)
+    }
+  }
+
+  const handleCheckboxChange = (e) => {
+    e.stopPropagation()
+    onSelect?.(item.id, e.target.checked)
+  }
 
   return (
     <Card
-      hoverable
-      className="media-card"
+      hoverable={!selectMode}
+      className={`media-card ${selectMode ? 'select-mode' : ''} ${selected ? 'selected' : ''}`}
+      onClick={handleClick}
       cover={
-        <div className="media-thumbnail" onClick={onClick}>
-          {thumbnailUrl ? (
+        <div className="media-thumbnail">
+          {/* Selection Checkbox */}
+          {selectMode && (
+            <div className="select-checkbox" onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={selected}
+                onChange={handleCheckboxChange}
+              />
+            </div>
+          )}
+
+          {!thumbnailError ? (
             <img
               alt={item.title}
               src={thumbnailUrl}
               className="thumbnail-image"
+              onError={() => setThumbnailError(true)}
             />
           ) : (
             <div className="thumbnail-placeholder">
@@ -66,15 +108,20 @@ function MediaCard({ item, type, onFavorite, onClick, onDelete }) {
               <ClockCircleOutlined /> {formatDuration(item.duration)}
             </div>
           )}
-          {isVideo && (
+          {!selectMode && isVideo && (
             <div className="play-overlay">
               <PlayCircleOutlined style={{ fontSize: 48 }} />
             </div>
           )}
+          {!selectMode && !isVideo && (
+            <div className="preview-overlay">
+              <EyeOutlined style={{ fontSize: 32 }} />
+            </div>
+          )}
         </div>
       }
-      actions={[
-        <Tooltip title={item.is_favorite ? '取消收藏' : '收藏'}>
+      actions={selectMode ? [] : [
+        <Tooltip title={item.is_favorite ? '取消收藏' : '收藏'} key="favorite">
           <Button
             type="text"
             icon={item.is_favorite ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined />}
@@ -84,9 +131,19 @@ function MediaCard({ item, type, onFavorite, onClick, onDelete }) {
             }}
           />
         </Tooltip>,
-        <span className="file-size">{formatFileSize(item.file_size)}</span>,
+        <Tooltip title="预览" key="preview">
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            onClick={(e) => {
+              e.stopPropagation()
+              onPreview?.(item)
+            }}
+          />
+        </Tooltip>,
+        <span className="file-size" key="size">{formatFileSize(item.file_size)}</span>,
         item.width && item.height && (
-          <span className="resolution">{item.width}x{item.height}</span>
+          <span className="resolution" key="resolution">{item.width}x{item.height}</span>
         ),
       ].filter(Boolean)}
     >

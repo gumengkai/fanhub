@@ -8,6 +8,7 @@ import VideoPlay from '@pages/VideoPlay'
 import ImageLibrary from '@pages/ImageLibrary'
 import SourceConfig from '@pages/SourceConfig'
 import Favorites from '@pages/Favorites'
+import ShortVideo from '@pages/ShortVideo'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/videos" element={<VideoLibrary />} />
           <Route path="/videos/:id" element={<VideoPlay />} />
+          <Route path="/short-video" element={<ShortVideo />} />
           <Route path="/images" element={<ImageLibrary />} />
           <Route path="/sources" element={<SourceConfig />} />
           <Route path="/favorites" element={<Favorites />} />

@@ -14,6 +14,8 @@ import {
   Popconfirm,
   Empty,
   Spin,
+  Progress,
+  Input,
 } from 'antd'
 import {
   HeartOutlined,
@@ -25,6 +27,8 @@ import {
   ClockCircleOutlined,
   FileOutlined,
   VideoCameraOutlined,
+  EyeOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 import { videosApi } from '@services/api'
 import VideoPlayer from '@components/VideoPlayer'
@@ -33,6 +37,7 @@ import RelatedVideos from './RelatedVideos'
 import './index.css'
 
 const { Title, Text, Paragraph } = Typography
+const { TextArea } = Input
 
 function VideoPlay() {
   const { id } = useParams()
@@ -42,6 +47,7 @@ function VideoPlay() {
   const [isEditing, setIsEditing] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [editedDescription, setEditedDescription] = useState('')
+  const [watchProgress, setWatchProgress] = useState({ position: 0, completed: false })
 
   const fetchVideo = useCallback(async () => {
     setLoading(true)
@@ -50,6 +56,20 @@ function VideoPlay() {
       setVideo(response)
       setEditedTitle(response.title)
       setEditedDescription(response.description || '')
+      
+      // Fetch watch history
+      try {
+        const historyRes = await fetch(`/api/history/video/${id}`)
+        if (historyRes.ok) {
+          const history = await historyRes.json()
+          setWatchProgress({
+            position: history.playback_position || 0,
+            completed: history.is_completed || false
+          })
+        }
+      } catch (e) {
+        // No history, that's ok
+      }
     } catch (error) {
       message.error('获取视频信息失败')
     } finally {
@@ -95,6 +115,23 @@ function VideoPlay() {
     }
   }
 
+  const handleProgressUpdate = async (videoId, position, duration, completed) => {
+    try {
+      await fetch(`/api/videos/${videoId}/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playback_position: position,
+          duration: duration,
+          is_completed: completed
+        })
+      })
+      setWatchProgress({ position, completed })
+    } catch (error) {
+      console.error('Failed to save progress:', error)
+    }
+  }
+
   const formatDuration = (seconds) => {
     if (!seconds) return '--:--'
     const hours = Math.floor(seconds / 3600)
@@ -119,6 +156,10 @@ function VideoPlay() {
     return `${size.toFixed(2)} ${units[unitIndex]}`
   }
 
+  const progressPercent = video?.duration > 0 
+    ? Math.round((watchProgress.position / video.duration) * 100) 
+    : 0
+
   if (loading) {
     return (
       <div className="video-play-loading">
@@ -138,36 +179,57 @@ function VideoPlay() {
 
   return (
     <div className="video-play-page">
-      {/* Back button */}
       <Button
         icon={<LeftOutlined />}
         onClick={() => navigate('/videos')}
-        style={{ marginBottom: 16 }}
+        className="back-button"
       >
         返回视频库
       </Button>
 
       <Row gutter={[24, 24]}>
-        {/* Main content - Video Player */}
         <Col xs={24} lg={16}>
-          <VideoPlayer video={video} />
+          <VideoPlayer 
+            video={video} 
+            onProgressUpdate={handleProgressUpdate}
+          />
 
-          {/* Video Info */}
+          {/* Watch progress indicator */}
+          {watchProgress.position > 0 && (
+            <Card className="progress-card" size="small">
+              <Space>
+                <HistoryOutlined />
+                <Text>观看进度</Text>
+                <Progress 
+                  percent={progressPercent} 
+                  size="small" 
+                  strokeColor="#fb7299"
+                  format={() => `${formatDuration(watchProgress.position)} / ${formatDuration(video.duration)}`}
+                />
+                {watchProgress.completed && (
+                  <Tag color="green">已完成</Tag>
+                )}
+              </Space>
+            </Card>
+          )}
+
           <Card className="video-info-card">
             {isEditing ? (
               <div className="video-edit-form">
-                <input
+                <Input
                   className="video-title-input"
                   value={editedTitle}
                   onChange={(e) => setEditedTitle(e.target.value)}
                   placeholder="视频标题"
+                  size="large"
                 />
-                <textarea
+                <TextArea
                   className="video-desc-input"
                   value={editedDescription}
                   onChange={(e) => setEditedDescription(e.target.value)}
                   placeholder="视频描述（可选）"
                   rows={3}
+                  autoSize={{ minRows: 2, maxRows: 6 }}
                 />
                 <Space>
                   <Button type="primary" onClick={handleSaveEdit}>
@@ -187,6 +249,7 @@ function VideoPlay() {
                       type={video.is_favorite ? 'primary' : 'default'}
                       icon={video.is_favorite ? <HeartFilled /> : <HeartOutlined />}
                       onClick={handleFavorite}
+                      style={{ borderColor: video.is_favorite ? '#fb7299' : undefined, background: video.is_favorite ? '#fb7299' : undefined }}
                     >
                       {video.is_favorite ? '已收藏' : '收藏'}
                     </Button>
@@ -216,12 +279,10 @@ function VideoPlay() {
                   </Paragraph>
                 )}
 
-                {/* Tags */}
                 <VideoTags videoId={video.id} tags={video.tags} onUpdate={fetchVideo} />
 
                 <Divider />
 
-                {/* Video metadata */}
                 <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }}>
                   <Descriptions.Item label={<><ClockCircleOutlined /> 时长</>}>
                     {formatDuration(video.duration)}
@@ -232,14 +293,14 @@ function VideoPlay() {
                   <Descriptions.Item label={<><FileOutlined /> 文件大小</>}>
                     {formatFileSize(video.file_size)}
                   </Descriptions.Item>
+                  <Descriptions.Item label={<><EyeOutlined /> 播放次数</>}>
+                    {video.view_count || 0}
+                  </Descriptions.Item>
                   <Descriptions.Item label="来源">
                     {video.source?.name || 'Unknown'}
                   </Descriptions.Item>
                   <Descriptions.Item label="添加时间">
                     {new Date(video.created_at).toLocaleString()}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="更新时间">
-                    {new Date(video.updated_at).toLocaleString()}
                   </Descriptions.Item>
                 </Descriptions>
               </>
@@ -247,9 +308,8 @@ function VideoPlay() {
           </Card>
         </Col>
 
-        {/* Sidebar - Related Videos */}
         <Col xs={24} lg={8}>
-          <RelatedVideos videoId={video.id} />
+          <RelatedVideos videoId={video.id} currentVideo={video} />
         </Col>
       </Row>
     </div>

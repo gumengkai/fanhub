@@ -30,6 +30,9 @@ import {
   FolderOutlined,
   CloudOutlined,
   ReloadOutlined,
+  VideoCameraOutlined,
+  PictureOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { sourcesApi } from '@services/api'
 
@@ -106,9 +109,14 @@ function SourceConfig() {
     setScanning({ ...scanning, [record.id]: true })
     try {
       const response = await sourcesApi.scan(record.id)
-      message.success(
-        `扫描完成: 新增 ${response.stats.videos_added} 个视频, ${response.stats.images_added} 个图片`
-      )
+      const stats = response.stats
+      const messages = []
+      if (stats.videos_added > 0) messages.push(`新增 ${stats.videos_added} 个视频`)
+      if (stats.videos_updated > 0) messages.push(`更新 ${stats.videos_updated} 个视频`)
+      if (stats.images_added > 0) messages.push(`新增 ${stats.images_added} 个图片`)
+      if (stats.images_updated > 0) messages.push(`更新 ${stats.images_updated} 个图片`)
+      
+      message.success(`扫描完成：${messages.join(', ') || '无变化'}`)
       fetchSources()
     } catch (error) {
       message.error('扫描失败')
@@ -124,12 +132,23 @@ function SourceConfig() {
       if (response.accessible) {
         message.success('连接正常')
       } else {
-        message.error('连接失败: ' + (response.details?.error || '无法访问'))
+        message.error('连接失败：' + (response.details?.error || '无法访问'))
       }
     } catch (error) {
       message.error('测试连接失败')
     } finally {
       setTestingConnection({ ...testingConnection, [record.id]: false })
+    }
+  }
+
+  const getMediaTypeLabel = (mediaType) => {
+    switch (mediaType) {
+      case 'video':
+        return { text: '视频', icon: <VideoCameraOutlined />, color: 'blue' }
+      case 'image':
+        return { text: '图片', icon: <PictureOutlined />, color: 'green' }
+      default:
+        return { text: '全部', icon: <AppstoreOutlined />, color: 'default' }
     }
   }
 
@@ -146,7 +165,20 @@ function SourceConfig() {
       ),
     },
     {
-      title: '类型',
+      title: '媒体类型',
+      dataIndex: 'media_type',
+      key: 'media_type',
+      render: (mediaType) => {
+        const { text, icon, color } = getMediaTypeLabel(mediaType)
+        return (
+          <Tag color={color} icon={icon}>
+            {text}
+          </Tag>
+        )
+      },
+    },
+    {
+      title: '来源类型',
       dataIndex: 'type',
       key: 'type',
       render: (type) => (
@@ -183,6 +215,25 @@ function SourceConfig() {
       dataIndex: 'last_scan_at',
       key: 'last_scan_at',
       render: (date) => date ? new Date(date).toLocaleString() : '从未',
+    },
+    {
+      title: '统计',
+      key: 'stats',
+      width: 120,
+      render: (_, record) => (
+        <Space direction="vertical" size="small">
+          {record.media_type !== 'image' && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              <VideoCameraOutlined /> {record.video_count || 0}
+            </Text>
+          )}
+          {record.media_type !== 'video' && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              <PictureOutlined /> {record.image_count || 0}
+            </Text>
+          )}
+        </Space>
+      ),
     },
     {
       title: '操作',
@@ -255,6 +306,35 @@ function SourceConfig() {
         </Space>
       </div>
 
+      <Card style={{ marginBottom: 24 }}>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Statistic
+              title="视频源"
+              value={sources.filter(s => s.media_type === 'video').length}
+              prefix={<VideoCameraOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic
+              title="图片源"
+              value={sources.filter(s => s.media_type === 'image').length}
+              prefix={<PictureOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic
+              title="混合源"
+              value={sources.filter(s => s.media_type === 'all').length}
+              prefix={<AppstoreOutlined />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Col>
+        </Row>
+      </Card>
+
       <Table
         columns={columns}
         dataSource={sources}
@@ -283,21 +363,40 @@ function SourceConfig() {
             <Input placeholder="例如：我的视频库" />
           </Form.Item>
 
-          <Form.Item
-            name="type"
-            label="类型"
-            rules={[{ required: true, message: '请选择类型' }]}
-          >
-            <Select placeholder="选择来源类型">
-              <Option value="local">本地文件夹</Option>
-              <Option value="nas">NAS 存储</Option>
-            </Select>
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="type"
+                label="来源类型"
+                rules={[{ required: true, message: '请选择类型' }]}
+              >
+                <Select placeholder="选择来源类型">
+                  <Option value="local">本地文件夹</Option>
+                  <Option value="nas">NAS 存储</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="media_type"
+                label="媒体类型"
+                rules={[{ required: true, message: '请选择媒体类型' }]}
+                initialValue="all"
+              >
+                <Select placeholder="选择媒体类型">
+                  <Option value="all"><AppstoreOutlined /> 全部 (视频 + 图片)</Option>
+                  <Option value="video"><VideoCameraOutlined /> 仅视频</Option>
+                  <Option value="image"><PictureOutlined /> 仅图片</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item
             name="path"
             label="路径"
             rules={[{ required: true, message: '请输入路径' }]}
+            extra="根据媒体类型，此路径将只扫描对应的文件"
           >
             <Input placeholder={form.getFieldValue('type') === 'nas' ? '例如：/shared/videos' : '例如：/home/user/videos'} />
           </Form.Item>
