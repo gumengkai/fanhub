@@ -1,0 +1,31 @@
+========================================
+  FunHub Frontend Startup Script
+========================================
+
+[0;34m[INFO][0m Checking Node.js installation...
+[0;32m[SUCCESS][0m Found Node.js v22.22.0
+[0;34m[INFO][0m Checking npm installation...
+[0;32m[SUCCESS][0m Found npm v10.9.4
+[0;34m[INFO][0m Checking if backend is running...
+[0;32m[SUCCESS][0m Backend is running at http://localhost:5000
+[0;34m[INFO][0m Installing Node.js dependencies...
+[0;34m[INFO][0m Dependencies already installed, checking for updates...
+
+up to date in 1s
+
+113 packages are looking for funding
+  run `npm fund` for details
+[0;32m[SUCCESS][0m Dependencies installed
+[0;34m[INFO][0m Starting FunHub frontend development server...
+[0;34m[INFO][0m Server will be available at: http://localhost:5173
+[0;34m[INFO][0m Press Ctrl+C to stop the server
+
+
+> funhub-frontend@1.0.0 dev
+> vite
+
+
+  VITE v5.4.21  ready in 212 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose

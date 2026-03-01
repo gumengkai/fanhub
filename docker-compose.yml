@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: funhub-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./storage:/app/storage
+      - ./media:/media:ro  # Mount your media directory here
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///app/storage/database/funhub.db
+      - THUMBNAIL_FOLDER=/app/storage/thumbnails
+    networks:
+      - funhub-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: funhub-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - funhub-network
+
+networks:
+  funhub-network:
+    driver: bridge
+
+volumes:
+  storage:
+    driver: local

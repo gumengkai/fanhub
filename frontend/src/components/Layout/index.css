@@ -1,0 +1,79 @@
+.app-layout {
+  min-height: 100vh;
+}
+
+/* Sider 固定定位 */
+.app-sider {
+  position: fixed !important;
+  height: 100vh;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+/* 展开时的左边距 */
+.app-layout > .ant-layout:not(.app-sider) {
+  margin-left: 200px;
+  transition: margin-left 0.2s;
+}
+
+/* 收起时的左边距 */
+.app-layout .ant-layout-sider-collapsed + .ant-layout {
+  margin-left: 80px;
+}
+
+.logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo-icon {
+  font-size: 28px;
+  color: #1890ff;
+}
+
+.logo-text {
+  margin-left: 12px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-menu {
+  padding-top: 16px;
+}
+
+/* 菜单项文字不换行 */
+.app-menu .ant-menu-title-content {
+  white-space: nowrap;
+}
+
+.header-search {
+  flex: 1;
+  max-width: 500px;
+}
+
+/* 确保内容区域有最小高度 */
+.app-layout .ant-layout {
+  min-height: 100vh;
+}
+
+/* 头部固定在顶部 */
+.app-layout .ant-layout-header {
+  position: sticky;
+  top: 0;
+  z-index: 99;
+  width: 100%;
+}
+
+/* 内容区域 */
+.app-layout .ant-layout-content {
+  flex: 1;
+}
