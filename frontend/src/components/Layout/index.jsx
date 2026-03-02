@@ -36,7 +36,6 @@ const mobileNavItems = [
 
 function AppLayout({ children }) {
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false)
-  const [searchVisible, setSearchVisible] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const {
@@ -51,7 +50,6 @@ function AppLayout({ children }) {
         navigate(`/videos?search=${encodeURIComponent(value)}`)
       }
     }
-    setSearchVisible(false)
   }
 
   const handleMobileNavClick = (path) => {
@@ -96,23 +94,14 @@ function AppLayout({ children }) {
 
         {/* Right Actions */}
         <div className="header-actions">
-          {/* Search Popup */}
-          <div className={`search-popup ${searchVisible ? 'visible' : ''}`}>
-            <Search
-              placeholder="搜索视频或图片..."
-              allowClear
-              enterButton={<SearchOutlined />}
-              size="middle"
-              onSearch={handleSearch}
-              autoFocus={searchVisible}
-              onBlur={() => setSearchVisible(false)}
-            />
-          </div>
-          <Button
-            type="text"
-            icon={<SearchOutlined />}
-            className="search-trigger"
-            onClick={() => setSearchVisible(true)}
+          {/* Fixed Search Box */}
+          <Search
+            placeholder="搜索视频或图片..."
+            allowClear
+            enterButton={<SearchOutlined />}
+            size="middle"
+            onSearch={handleSearch}
+            className="header-search"
           />
 
           {/* Settings Dropdown */}

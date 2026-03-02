@@ -7,20 +7,19 @@ import {
   Input,
   Button,
   message,
-  Popconfirm,
   Empty,
   Switch,
+  Tag,
 } from 'antd'
 import {
-  ReloadOutlined,
   DeleteOutlined,
   HeartOutlined,
   HeartFilled,
   PlayCircleOutlined,
   FilterOutlined,
-  PictureOutlined,
+  TagsOutlined,
 } from '@ant-design/icons'
-import { videosApi } from '@services/api'
+import { videosApi, tagsApi } from '@services/api'
 import MediaGrid from '@components/MediaGrid'
 
 const { Title } = Typography
@@ -32,7 +31,7 @@ function VideoLibrary() {
   const navigate = useNavigate()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(false)
-  const [fixingThumbnails, setFixingThumbnails] = useState(false)
+  const [tags, setTags] = useState([])
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 24,
@@ -42,6 +41,21 @@ function VideoLibrary() {
   const [sortOrder, setSortOrder] = useState('desc')
   const [searchQuery, setSearchQuery] = useState('')
   const [favoriteOnly, setFavoriteOnly] = useState(false)
+  const [selectedTag, setSelectedTag] = useState(null)
+
+  // Fetch all tags for filter dropdown
+  useEffect(() => {
+    fetchTags()
+  }, [])
+
+  const fetchTags = async () => {
+    try {
+      const response = await tagsApi.getList()
+      setTags(response || [])
+    } catch (error) {
+      console.error('Failed to fetch tags:', error)
+    }
+  }
 
   const fetchVideos = useCallback(async () => {
     setLoading(true)
@@ -55,6 +69,9 @@ function VideoLibrary() {
       }
       if (favoriteOnly) {
         params.favorite = true
+      }
+      if (selectedTag) {
+        params.tag_id = selectedTag
       }
 
       const response = await videosApi.getList(params)
@@ -70,7 +87,7 @@ function VideoLibrary() {
     } finally {
       setLoading(false)
     }
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, favoriteOnly])
+  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, favoriteOnly, selectedTag])
 
   useEffect(() => {
     fetchVideos()
@@ -128,18 +145,17 @@ function VideoLibrary() {
     navigate(`/videos/${video.id}`)
   }
 
-  const handleFixThumbnails = async () => {
-    setFixingThumbnails(true)
-    try {
-      const response = await videosApi.fixThumbnails()
-      message.success(response.message || '缩略图修复完成')
-      fetchVideos()
-    } catch (error) {
-      message.error('修复缩略图失败')
-      console.error(error)
-    } finally {
-      setFixingThumbnails(false)
+  const handlePlayByTag = () => {
+    if (selectedTag) {
+      navigate(`/short-video?tag=${selectedTag}`)
+    } else {
+      navigate('/short-video')
     }
+  }
+
+  const handleTagChange = (value) => {
+    setSelectedTag(value)
+    setPagination({ ...pagination, current: 1 })
   }
 
   const sortOptions = [
@@ -175,6 +191,20 @@ function VideoLibrary() {
             ))}
           </Select>
 
+          <Select
+            value={selectedTag}
+            onChange={handleTagChange}
+            style={{ width: 150 }}
+            placeholder={<><TagsOutlined /> 按标签筛选</>}
+            allowClear
+          >
+            {tags.map((tag) => (
+              <Option key={tag.id} value={tag.id}>
+                <Tag color={tag.color} style={{ margin: 0 }}>{tag.name}</Tag>
+              </Option>
+            ))}
+          </Select>
+
           <Space>
             <FilterOutlined />
             <Switch
@@ -187,27 +217,11 @@ function VideoLibrary() {
           </Space>
 
           <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchVideos}
-            loading={loading}
-          >
-            刷新
-          </Button>
-
-          <Button
-            icon={<PictureOutlined />}
-            onClick={handleFixThumbnails}
-            loading={fixingThumbnails}
-          >
-            修复缩略图
-          </Button>
-
-          <Button
             type="primary"
             icon={<PlayCircleOutlined />}
-            onClick={() => navigate('/short-video')}
+            onClick={handlePlayByTag}
           >
-            短视频模式
+            {selectedTag ? '播放标签视频' : '短视频模式'}
           </Button>
         </Space>
       </div>

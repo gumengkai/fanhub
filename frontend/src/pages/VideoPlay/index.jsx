@@ -115,6 +115,11 @@ function VideoPlay() {
     }
   }
 
+  // 只更新视频标签，不重新获取整个视频
+  const handleTagsUpdate = (updatedTags) => {
+    setVideo({ ...video, tags: updatedTags })
+  }
+
   const handleProgressUpdate = async (videoId, position, duration, completed) => {
     try {
       await fetch(`/api/videos/${videoId}/history`, {
@@ -279,7 +284,7 @@ function VideoPlay() {
                   </Paragraph>
                 )}
 
-                <VideoTags videoId={video.id} tags={video.tags} onUpdate={fetchVideo} />
+                <VideoTags videoId={video.id} tags={video.tags} onUpdate={handleTagsUpdate} />
 
                 <Divider />
 

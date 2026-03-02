@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Typography,
-  Space,
-  Button,
   message,
   Tabs,
   Badge,
@@ -11,22 +10,27 @@ import {
   HeartOutlined,
   VideoCameraOutlined,
   PictureOutlined,
-  ReloadOutlined,
 } from '@ant-design/icons'
 import { favoritesApi, videosApi, imagesApi } from '@services/api'
 import MediaGrid from '@components/MediaGrid'
+import Slideshow from '@components/Slideshow'
 
 const { Title } = Typography
 
 function Favorites() {
+  const navigate = useNavigate()
   const [favorites, setFavorites] = useState([])
   const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState({ video: 0, image: 0 })
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 24,
     total: 0,
   })
-  const [mediaType, setMediaType] = useState(undefined)
+  const [mediaType, setMediaType] = useState('video')
+  const [slideshowVisible, setSlideshowVisible] = useState(false)
+  const [slideshowImages, setSlideshowImages] = useState([])
+  const [slideshowStartIndex, setSlideshowStartIndex] = useState(0)
 
   const fetchFavorites = useCallback(async () => {
     setLoading(true)
@@ -50,9 +54,29 @@ function Favorites() {
     }
   }, [pagination.current, pagination.pageSize, mediaType])
 
+  // 获取视频和图片各自的收藏数量
+  const fetchStats = useCallback(async () => {
+    try {
+      const [videoRes, imageRes] = await Promise.all([
+        favoritesApi.getList({ type: 'video', per_page: 1 }),
+        favoritesApi.getList({ type: 'image', per_page: 1 }),
+      ])
+      setStats({
+        video: videoRes.total || 0,
+        image: imageRes.total || 0,
+      })
+    } catch (error) {
+      console.error('Failed to fetch stats:', error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchFavorites()
   }, [fetchFavorites])
+
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
 
   const handlePageChange = (page, pageSize) => {
     setPagination({
@@ -63,7 +87,7 @@ function Favorites() {
   }
 
   const handleTabChange = (key) => {
-    setMediaType(key === 'all' ? undefined : key)
+    setMediaType(key)
     setPagination({ ...pagination, current: 1 })
   }
 
@@ -75,13 +99,27 @@ function Favorites() {
       // 直接从列表中移除该条目，不刷新整个列表
       setFavorites(favorites.filter(f => f.id !== item.id))
       setPagination({ ...pagination, total: pagination.total - 1 })
+      // 更新统计
+      setStats(prev => ({
+        ...prev,
+        [item.media_type]: Math.max(0, prev[item.media_type] - 1)
+      }))
     } catch (error) {
       message.error('操作失败')
     }
   }
 
-  const filteredVideos = favorites.filter((item) => item.media_type === 'video')
-  const filteredImages = favorites.filter((item) => item.media_type === 'image')
+  // 视频点击播放
+  const handleVideoClick = (video) => {
+    navigate(`/videos/${video.id}`)
+  }
+
+  // 图片点击预览
+  const handleImageClick = (image) => {
+    setSlideshowImages(favorites)
+    setSlideshowStartIndex(favorites.findIndex(img => img.id === image.id))
+    setSlideshowVisible(true)
+  }
 
   return (
     <div>
@@ -90,57 +128,25 @@ function Favorites() {
           <HeartOutlined style={{ color: '#ff4d4f', marginRight: 12 }} />
           我的收藏
         </Title>
-
-        <Space wrap>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchFavorites}
-            loading={loading}
-          >
-            刷新
-          </Button>
-        </Space>
       </div>
 
       <Tabs
-        defaultActiveKey="all"
+        defaultActiveKey="video"
+        activeKey={mediaType}
         onChange={handleTabChange}
         items={[
-          {
-            key: 'all',
-            label: (
-              <span>
-                <HeartOutlined />
-                全部
-                <Badge count={pagination.total} style={{ marginLeft: 8 }} />
-              </span>
-            ),
-            children: (
-              <MediaGrid
-                items={favorites}
-                type="mixed"
-                loading={loading}
-                pagination={{
-                  current: pagination.current,
-                  pageSize: pagination.pageSize,
-                  total: pagination.total,
-                  onChange: handlePageChange,
-                }}
-                onFavorite={handleUnfavorite}
-              />
-            ),
-          },
           {
             key: 'video',
             label: (
               <span>
                 <VideoCameraOutlined />
                 视频
+                <Badge count={stats.video} style={{ marginLeft: 8 }} />
               </span>
             ),
             children: (
               <MediaGrid
-                items={filteredVideos}
+                items={favorites}
                 type="video"
                 loading={loading}
                 pagination={{
@@ -150,6 +156,7 @@ function Favorites() {
                   onChange: handlePageChange,
                 }}
                 onFavorite={handleUnfavorite}
+                onItemClick={handleVideoClick}
               />
             ),
           },
@@ -159,11 +166,12 @@ function Favorites() {
               <span>
                 <PictureOutlined />
                 图片
+                <Badge count={stats.image} style={{ marginLeft: 8 }} />
               </span>
             ),
             children: (
               <MediaGrid
-                items={filteredImages}
+                items={favorites}
                 type="image"
                 loading={loading}
                 pagination={{
@@ -173,10 +181,18 @@ function Favorites() {
                   onChange: handlePageChange,
                 }}
                 onFavorite={handleUnfavorite}
+                onItemClick={handleImageClick}
               />
             ),
           },
         ]}
+      />
+
+      <Slideshow
+        images={slideshowImages}
+        visible={slideshowVisible}
+        onClose={() => setSlideshowVisible(false)}
+        initialIndex={slideshowStartIndex}
       />
     </div>
   )

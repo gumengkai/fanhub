@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Space, Tag, Modal, Input, message, Select, Switch, Tooltip, Slider } from 'antd'
 import {
   HeartOutlined, HeartFilled, DeleteOutlined, TagsOutlined,
@@ -23,6 +23,8 @@ const { TextArea } = Input
 
 function ShortVideo() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const tagParam = searchParams.get('tag')
   const [allVideos, setAllVideos] = useState([])
   const [playlist, setPlaylist] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -33,8 +35,8 @@ function ShortVideo() {
   const [volume, setVolume] = useState(1)
   const [showTags, setShowTags] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
-  const [filterType, setFilterType] = useState('all')
-  const [selectedTag, setSelectedTag] = useState(null)
+  const [filterType, setFilterType] = useState(tagParam ? 'tag' : 'all')
+  const [selectedTag, setSelectedTag] = useState(tagParam ? parseInt(tagParam) : null)
   const [tags, setTags] = useState([])
   const [editingVideo, setEditingVideo] = useState(null)
   const [editedTitle, setEditedTitle] = useState('')
@@ -94,7 +96,14 @@ function ShortVideo() {
       filtered = allVideos.filter(v => v.tags && v.tags.some(t => t.id === selectedTag))
     }
     setPlaylist(filtered)
-    setCurrentIndex(0)
+    // 如果当前视频在新筛选列表中，保持当前索引，否则重置为0
+    const currentVideoId = playlist[currentIndex]?.id
+    const newIndex = filtered.findIndex(v => v.id === currentVideoId)
+    if (newIndex === -1) {
+      setCurrentIndex(0)
+    } else if (newIndex !== currentIndex) {
+      setCurrentIndex(newIndex)
+    }
   }, [filterType, selectedTag, allVideos])
 
   useEffect(() => {
@@ -177,6 +186,11 @@ function ShortVideo() {
         }).catch(console.error)
       }
     }, 500)
+  }
+
+  // 处理标签选择 - 只在确认后应用筛选
+  const handleTagSelect = (value) => {
+    setSelectedTag(value)
   }
 
   const togglePlay = () => {
@@ -290,7 +304,14 @@ function ShortVideo() {
       for (const tagId of selectedTags) {
         if (!currentTagIds.includes(tagId)) await videosApi.addTag(editingVideo.id, tagId)
       }
-      await fetchAllVideos()
+      // 只更新当前视频的信息，不刷新整个列表
+      const updatedTags = tags.filter(t => selectedTags.includes(t.id))
+      const updatedVideo = { ...editingVideo, title: editedTitle, description: editedDescription, tags: updatedTags }
+      const newPlaylist = playlist.map((v, i) =>
+        i === currentIndex ? updatedVideo : v
+      )
+      setPlaylist(newPlaylist)
+      setAllVideos(prev => prev.map(v => v.id === editingVideo.id ? updatedVideo : v))
       setShowTags(false)
       message.success('保存成功')
     } catch (error) { message.error('保存失败') }
@@ -361,7 +382,15 @@ function ShortVideo() {
               <Option value="tag">标签筛选</Option>
             </Select>
             {filterType === 'tag' && (
-              <Select value={selectedTag} onChange={setSelectedTag} style={{ width: 150 }} placeholder="选择标签" allowClear>
+              <Select
+                value={selectedTag}
+                onChange={handleTagSelect}
+                style={{ width: 150 }}
+                placeholder="选择标签"
+                allowClear
+                onClear={() => handleTagSelect(null)}
+                dropdownMatchSelectWidth={false}
+              >
                 {tags.map(tag => <Option key={tag.id} value={tag.id}>{tag.name}</Option>)}
               </Select>
             )}
@@ -441,7 +470,7 @@ function ShortVideo() {
               <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(10)} size="large" />
               <Button type="text" icon={<StepForwardOutlined />} onClick={nextVideo} size="large" />
               <div className="volume-control">
-                <Button type="text" icon={isMuted ? <MutedOutlined /> : <VolumeUpOutlined />} onClick={toggleMute} />
+                <Button type="text" icon={isMuted ? <MutedOutlined /> : <SoundOutlined />} onClick={toggleMute} />
                 <Slider className="volume-slider" value={isMuted ? 0 : volume} max={1} step={0.1} onChange={handleVolumeChange} />
               </div>
               <Button type="text" icon={<span style={{ fontSize: 14, fontWeight: 'bold' }}>{playbackRate}x</span>} onClick={handlePlaybackRateChange} size="large" />

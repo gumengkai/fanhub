@@ -13,7 +13,6 @@ import {
   Checkbox,
 } from 'antd'
 import {
-  ReloadOutlined,
   DeleteOutlined,
   EyeOutlined,
   PlayCircleOutlined,
@@ -281,14 +280,6 @@ function ImageLibrary() {
               size="small"
             />
           </Space>
-
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchImages}
-            loading={loading}
-          >
-            刷新
-          </Button>
 
           <Button
             type="primary"

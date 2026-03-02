@@ -1,0 +1,136 @@
+.home-page {
+  padding-bottom: 24px;
+}
+
+/* 统计卡片样式 */
+.stat-card {
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 区块卡片样式 */
+.section-card {
+  border-radius: 12px;
+}
+
+.section-card .ant-card-head {
+  border-bottom: 2px solid #f0f0f0;
+  font-weight: 600;
+}
+
+/* Top排行样式 */
+.top-item {
+  position: relative;
+}
+
+.top-rank {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 10;
+}
+
+.top-rank.top-three {
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 170, 0, 0.4);
+}
+
+.view-count {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+/* 标签卡片样式 */
+.tags-card {
+  height: fit-content;
+}
+
+.tags-card .ant-card-body {
+  padding: 0;
+}
+
+.tag-list-item {
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  padding: 12px 24px !important;
+}
+
+.tag-list-item:hover {
+  background-color: #f5f5f5;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.tag-rank {
+  width: 24px;
+  height: 24px;
+  background: #f0f0f0;
+  color: #666;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tag-rank.top-three {
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  color: #fff;
+}
+
+.tag-name {
+  flex: 1;
+  font-size: 14px;
+  padding: 4px 12px;
+}
+
+.tag-count {
+  font-size: 12px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .section-card {
+    margin-bottom: 16px;
+  }
+
+  .top-rank {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .tag-item {
+    gap: 8px;
+  }
+
+  .tag-list-item {
+    padding: 10px 16px !important;
+  }
+}

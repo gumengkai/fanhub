@@ -33,7 +33,11 @@ function VideoTags({ videoId, tags = [], onUpdate }) {
       message.success('标签已添加')
       setSelectedTagId(null)
       setPopoverVisible(false)
-      onUpdate()
+      // 更新标签列表，不刷新整个页面
+      const addedTag = allTags.find(t => t.id === selectedTagId)
+      if (addedTag) {
+        onUpdate([...tags, addedTag])
+      }
     } catch (error) {
       message.error('添加标签失败')
     } finally {
@@ -45,7 +49,8 @@ function VideoTags({ videoId, tags = [], onUpdate }) {
     try {
       await videosApi.removeTag(videoId, tagId)
       message.success('标签已移除')
-      onUpdate()
+      // 更新标签列表，不刷新整个页面
+      onUpdate(tags.filter(t => t.id !== tagId))
     } catch (error) {
       message.error('移除标签失败')
     }
