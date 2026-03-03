@@ -78,8 +78,10 @@ ENV DATABASE_PATH=/app/storage/database/funhub.db
 ENV THUMBNAIL_FOLDER=/app/storage/thumbnails
 ENV CORS_ORIGINS=http://localhost,http://127.0.0.1,http://your-domain.com
 
-# ============ EXPOSE PORT ============
-EXPOSE 8080
+# ============ EXPOSE PORTS ============
+# 8080 - Nginx (Frontend + API Proxy)
+# 5000 - Flask Backend (Direct API access for mobile clients)
+EXPOSE 8080 5000
 
 # ============ HEALTH CHECK ============
 HEALTHCHECK --interval=30s --timeout=30s --start-period=15s --retries=3 \
