@@ -41,7 +41,7 @@ def get_videos():
     order = request.args.get('order', 'desc')
     source_id = request.args.get('source_id', type=int)
     tag_id = request.args.get('tag_id', type=int)
-    favorite = request.args.get('favorite', type=bool)
+    favorite = request.args.get('favorite')
 
     query = Video.query
 
@@ -53,9 +53,11 @@ def get_videos():
 
     if tag_id:
         query = query.join(Video.tags).filter(Tag.id == tag_id)
-    
+
     if favorite is not None:
-        query = query.filter(Video.is_favorite == favorite)
+        # 处理 'true', '1', 1 等值为 True
+        is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
+        query = query.filter(Video.is_favorite == is_fav)
 
     if sort_by == 'view_count':
         sort_column = Video.view_count
@@ -156,12 +158,20 @@ def stream_video(video_id):
 
 @videos_bp.route('/<int:video_id>', methods=['DELETE'])
 def delete_video(video_id):
-    """Delete video record."""
+    """Delete video record and file from filesystem."""
     video = Video.query.get_or_404(video_id)
 
+    # Delete thumbnail if exists
     if video.thumbnail_path and os.path.exists(video.thumbnail_path):
         try:
             os.remove(video.thumbnail_path)
+        except OSError:
+            pass
+
+    # Delete video file if exists
+    if video.path and os.path.exists(video.path):
+        try:
+            os.remove(video.path)
         except OSError:
             pass
 
@@ -373,7 +383,7 @@ def update_video_history(video_id):
     video = Video.query.get_or_404(video_id)
     data = request.get_json()
     playback_position = data.get('playback_position', 0)
-    duration = data.get('duration', 0)
+    duration = data.get('duration') or 0
     is_completed = data.get('is_completed', False)
     
     existing = WatchHistory.query.filter_by(video_id=video_id).first()

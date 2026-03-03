@@ -16,6 +16,7 @@ def get_images():
     sort_by = request.args.get('sort_by', 'created_at')
     order = request.args.get('order', 'desc')
     source_id = request.args.get('source_id', type=int)
+    favorite = request.args.get('favorite')
 
     query = Image.query
 
@@ -24,6 +25,11 @@ def get_images():
 
     if source_id:
         query = query.filter(Image.source_id == source_id)
+
+    if favorite is not None:
+        # 处理 'true', '1', 1 等值为 True
+        is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
+        query = query.filter(Image.is_favorite == is_fav)
 
     # Sorting
     sort_column = getattr(Image, sort_by, Image.created_at)
@@ -117,13 +123,20 @@ def get_image_thumbnail(image_id):
 
 @images_bp.route('/<int:image_id>', methods=['DELETE'])
 def delete_image(image_id):
-    """Delete image record (not the file)."""
+    """Delete image record and file from filesystem."""
     image = Image.query.get_or_404(image_id)
 
     # Delete thumbnail if exists
     if image.thumbnail_path and os.path.exists(image.thumbnail_path):
         try:
             os.remove(image.thumbnail_path)
+        except OSError:
+            pass
+
+    # Delete image file if exists
+    if image.path and os.path.exists(image.path):
+        try:
+            os.remove(image.path)
         except OSError:
             pass
 
@@ -170,6 +183,13 @@ def batch_delete_images():
                     except OSError:
                         pass
 
+                # Delete image file if exists
+                if image.path and os.path.exists(image.path):
+                    try:
+                        os.remove(image.path)
+                    except OSError:
+                        pass
+
                 db.session.delete(image)
                 deleted += 1
             else:
@@ -194,7 +214,7 @@ def get_all_images():
     """Get all images for slideshow (no pagination)."""
     search = request.args.get('search', '')
     source_id = request.args.get('source_id', type=int)
-    favorite = request.args.get('favorite', type=int)
+    favorite = request.args.get('favorite')
     limit = request.args.get('limit', 500, type=int)
 
     query = Image.query
@@ -206,7 +226,9 @@ def get_all_images():
         query = query.filter(Image.source_id == source_id)
 
     if favorite is not None:
-        query = query.filter(Image.is_favorite == bool(favorite))
+        # 处理 'true', '1', 1 等值为 True
+        is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
+        query = query.filter(Image.is_favorite == is_fav)
 
     images = query.order_by(Image.created_at).limit(limit).all()
 

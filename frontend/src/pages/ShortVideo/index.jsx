@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Space, Tag, Modal, Input, message, Select, Switch, Tooltip, Slider } from 'antd'
+import { Button, Space, Tag, Modal, Input, message, Select, Tooltip, Slider } from 'antd'
 import {
   HeartOutlined, HeartFilled, DeleteOutlined, TagsOutlined,
   PlayCircleOutlined, PauseCircleOutlined, StepBackwardOutlined, StepForwardOutlined,
   OrderedListOutlined, FullscreenOutlined, FullscreenExitOutlined,
-  LeftOutlined, SoundOutlined, MutedOutlined, HomeOutlined, FilterOutlined,
-  ClockCircleOutlined,
+  LeftOutlined, SoundOutlined, MutedOutlined, HomeOutlined,
+  ClockCircleOutlined, EditOutlined,
 } from '@ant-design/icons'
 import { videosApi, tagsApi } from '@services/api'
 import './index.css'
@@ -20,6 +20,9 @@ const ShuffleIcon = () => (
 
 const { Option } = Select
 const { TextArea } = Input
+
+// 检测是否为移动设备
+const isMobile = () => window.innerWidth <= 768 || 'ontouchstart' in window
 
 function ShortVideo() {
   const navigate = useNavigate()
@@ -37,6 +40,7 @@ function ShortVideo() {
   const [showFilter, setShowFilter] = useState(false)
   const [filterType, setFilterType] = useState(tagParam ? 'tag' : 'all')
   const [selectedTag, setSelectedTag] = useState(tagParam ? parseInt(tagParam) : null)
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const [tags, setTags] = useState([])
   const [editingVideo, setEditingVideo] = useState(null)
   const [editedTitle, setEditedTitle] = useState('')
@@ -47,12 +51,23 @@ function ShortVideo() {
   const [duration, setDuration] = useState(0)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
-  
+  const [isMobileView, setIsMobileView] = useState(false)
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false)
+
   const videoRef = useRef(null)
   const containerRef = useRef(null)
   const controlsTimeoutRef = useRef(null)
   const touchStartRef = useRef(null)
   const saveProgressRef = useRef(null)
+  const progressRef = useRef(null)
+
+  // 检测移动设备
+  useEffect(() => {
+    const checkMobile = () => setIsMobileView(isMobile())
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     fetchAllVideos()
@@ -110,13 +125,18 @@ function ShortVideo() {
     const handleMouseMove = () => {
       setShowControls(true)
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
-      if (isPlaying) controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000)
+      // 如果下拉框打开或视频暂停，不自动隐藏控制栏
+      if (isPlaying && !tagDropdownOpen) {
+        controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000)
+      }
     }
 
     const container = containerRef.current
     if (container) {
       container.addEventListener('mousemove', handleMouseMove)
-      container.addEventListener('mouseleave', () => isPlaying && setShowControls(false))
+      container.addEventListener('mouseleave', () => {
+        if (isPlaying && !tagDropdownOpen) setShowControls(false)
+      })
       container.addEventListener('mouseenter', () => setShowControls(true))
     }
 
@@ -124,7 +144,7 @@ function ShortVideo() {
       if (container) container.removeEventListener('mousemove', handleMouseMove)
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
     }
-  }, [isPlaying])
+  }, [isPlaying, tagDropdownOpen])
 
   useEffect(() => {
     const video = videoRef.current
@@ -253,6 +273,19 @@ function ShortVideo() {
   }
   const handleSeekBeforeChange = () => setIsDragging(true)
 
+  // 移动端进度条点击处理
+  const handleProgressClick = (e) => {
+    if (!isMobileView || !progressRef.current) return
+    const rect = progressRef.current.getBoundingClientRect()
+    const percent = (e.clientX - rect.left) / rect.width
+    const newTime = percent * duration
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime
+      setCurrentTime(newTime)
+      saveProgress(newTime, duration)
+    }
+  }
+
   const handlePlaybackRateChange = () => {
     const rates = [0.5, 0.75, 1, 1.25, 1.5, 2]
     const currentIndex = rates.indexOf(playbackRate)
@@ -264,11 +297,18 @@ function ShortVideo() {
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement && containerRef.current) {
       try {
+        // 移动端使用屏幕方向锁定
+        if (isMobileView && screen.orientation) {
+          await screen.orientation.lock('landscape').catch(() => {})
+        }
         await containerRef.current.requestFullscreen()
         setIsFullscreen(true)
       } catch (err) { console.error('Fullscreen error:', err) }
     } else {
       try {
+        if (screen.orientation) {
+          await screen.orientation.unlock().catch(() => {})
+        }
         await document.exitFullscreen()
         setIsFullscreen(false)
       } catch (err) { console.error('Exit fullscreen error:', err) }
@@ -333,8 +373,20 @@ function ShortVideo() {
     })
   }
 
+  // 触摸手势处理 - 优化移动端滑动体验
   const handleTouchStart = (e) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() }
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return
+    // 防止默认滚动行为
+    if (isMobileView) {
+      const deltaY = e.touches[0].clientY - touchStartRef.current.y
+      if (Math.abs(deltaY) > 10) {
+        e.preventDefault()
+      }
+    }
   }
 
   const handleTouchEnd = (e) => {
@@ -342,11 +394,31 @@ function ShortVideo() {
     const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x
     const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y
     const deltaTime = Date.now() - touchStartRef.current.time
+
     if (deltaTime < 300) {
-      if (Math.abs(deltaY) > 50) { if (deltaY > 0) prevVideo(); else nextVideo() }
-      if (Math.abs(deltaX) > 50) { if (deltaX > 0) skip(10); else skip(-10) }
+      // 垂直滑动切换视频
+      if (Math.abs(deltaY) > 50 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        if (deltaY > 0) prevVideo()
+        else nextVideo()
+      }
+      // 水平滑动快进/快退
+      else if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX > 0) skip(10)
+        else skip(-10)
+      }
+      // 点击显示/隐藏控制栏
+      else if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+        setShowControls(prev => !prev)
+      }
     }
     touchStartRef.current = null
+  }
+
+  // 双击处理
+  const handleDoubleClick = () => {
+    if (isMobileView) {
+      toggleFavorite()
+    }
   }
 
   const formatTime = (seconds) => {
@@ -371,39 +443,51 @@ function ShortVideo() {
   }
 
   return (
-    <div className="short-video-page" ref={containerRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      {showControls && (
-        <div className="top-bar">
-          <Button type="text" icon={<LeftOutlined />} onClick={() => navigate('/videos')} className="back-btn">返回</Button>
-          <div className="filter-controls">
-            <Select value={filterType} onChange={setFilterType} style={{ width: 120 }}>
-              <Option value="all">全部视频</Option>
-              <Option value="favorite">收藏</Option>
-              <Option value="tag">标签筛选</Option>
+    <div
+      className="short-video-page"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onDoubleClick={handleDoubleClick}
+    >
+      {/* 顶部导航栏 */}
+      <div className={`top-bar ${showControls ? '' : 'hidden'}`}>
+        <Button type="text" icon={<LeftOutlined />} onClick={() => navigate('/videos')} className="back-btn">返回</Button>
+        <div className="filter-controls">
+          <Select value={filterType} onChange={setFilterType} style={{ width: 120 }} size={isMobileView ? 'small' : 'middle'}>
+            <Option value="all">全部视频</Option>
+            <Option value="favorite">收藏</Option>
+            <Option value="tag">标签筛选</Option>
+          </Select>
+          {filterType === 'tag' && (
+            <Select
+              value={selectedTag}
+              onChange={handleTagSelect}
+              style={{ width: isMobileView ? 120 : 150 }}
+              placeholder="选择标签"
+              allowClear
+              onClear={() => handleTagSelect(null)}
+              dropdownMatchSelectWidth={false}
+              size={isMobileView ? 'small' : 'middle'}
+              onDropdownVisibleChange={(open) => {
+                setTagDropdownOpen(open)
+                if (open) setShowControls(true)
+              }}
+            >
+              {tags.map(tag => <Option key={tag.id} value={tag.id}>{tag.name}</Option>)}
             </Select>
-            {filterType === 'tag' && (
-              <Select
-                value={selectedTag}
-                onChange={handleTagSelect}
-                style={{ width: 150 }}
-                placeholder="选择标签"
-                allowClear
-                onClear={() => handleTagSelect(null)}
-                dropdownMatchSelectWidth={false}
-              >
-                {tags.map(tag => <Option key={tag.id} value={tag.id}>{tag.name}</Option>)}
-              </Select>
-            )}
-          </div>
-          <Space>
-            <Button type={isRandom ? 'primary' : 'default'} icon={<ShuffleIcon />} onClick={() => setIsRandom(!isRandom)} size="small">
-              {isRandom ? '随机' : '顺序'}
-            </Button>
-            <span className="video-counter">{currentIndex + 1} / {playlist.length}</span>
-          </Space>
+          )}
         </div>
-      )}
+        <Space>
+          <Button type={isRandom ? 'primary' : 'default'} icon={<ShuffleIcon />} onClick={() => setIsRandom(!isRandom)} size={isMobileView ? 'small' : 'middle'}>
+            {isMobileView ? '' : (isRandom ? '随机' : '顺序')}
+          </Button>
+          <span className="video-counter">{currentIndex + 1} / {playlist.length}</span>
+        </Space>
+      </div>
 
+      {/* 视频容器 */}
       <div className="video-container">
         <video
           ref={videoRef}
@@ -412,77 +496,155 @@ function ShortVideo() {
           onClick={togglePlay}
           autoPlay={isPlaying}
           loop
+          playsInline
+          webkit-playsinline="true"
         />
 
-        <div className="video-overlay">
+        {/* 视频信息覆盖层 */}
+        <div className={`video-overlay ${showControls ? '' : 'hidden'}`}>
           <div className="video-info">
             <h3 className="video-title">{currentVideo?.title}</h3>
             {currentVideo?.description && <p className="video-description">{currentVideo.description}</p>}
             {currentVideo?.tags && currentVideo.tags.length > 0 && (
               <div className="video-tags">
-                {currentVideo.tags.map(tag => <Tag key={tag.id} color={tag.color}>{tag.name}</Tag>)}
+                {currentVideo.tags.map(tag => <Tag key={tag.id} color={tag.color || '#fb7299'}>{tag.name}</Tag>)}
               </div>
             )}
           </div>
         </div>
 
-        {showControls && (
-          <div className="action-buttons">
-            <Tooltip title="收藏 (C)">
-              <Button type="text" icon={currentVideo?.is_favorite ? <HeartFilled /> : <HeartOutlined />} onClick={toggleFavorite} size="large" className={`action-btn ${currentVideo?.is_favorite ? 'favorited' : ''}`} />
-            </Tooltip>
-            <Tooltip title="标签 (L)">
-              <Button type="text" icon={<TagsOutlined />} onClick={openTagModal} size="large" className="action-btn" />
-            </Tooltip>
-            <Tooltip title="删除">
-              <Button type="text" icon={<DeleteOutlined />} onClick={handleDelete} size="large" className="action-btn danger" />
-            </Tooltip>
-            <div className="video-stats"><span>▶ {currentVideo?.view_count || 0} 播放</span></div>
+        {/* 右侧操作按钮 - 抖音风格 */}
+        <div className={`action-buttons ${showControls ? '' : 'hidden'}`}>
+          <div className="action-group">
+            <Button
+              type="text"
+              icon={currentVideo?.is_favorite ? <HeartFilled /> : <HeartOutlined />}
+              onClick={toggleFavorite}
+              size="large"
+              className={`action-btn ${currentVideo?.is_favorite ? 'favorited' : ''}`}
+            />
+            <span className="action-btn-text">喜欢</span>
+          </div>
+
+          <div className="action-group">
+            <Button
+              type="text"
+              icon={<TagsOutlined />}
+              onClick={openTagModal}
+              size="large"
+              className="action-btn"
+            />
+            <span className="action-btn-text">标签</span>
+          </div>
+
+          <div className="action-group delete-group">
+            <Button
+              type="text"
+              icon={<DeleteOutlined />}
+              onClick={handleDelete}
+              size="large"
+              className="action-btn danger"
+            />
+            <span className="action-btn-text">删除</span>
+          </div>
+        </div>
+
+        {/* 中央播放按钮 */}
+        {!isPlaying && (
+          <div className="center-play-btn" onClick={togglePlay}>
+            <PlayCircleOutlined />
           </div>
         )}
 
-        {!isPlaying && showControls && (
-          <div className="center-play-btn" onClick={togglePlay}><PlayCircleOutlined /></div>
-        )}
-
-        {showControls && (
-          <div className="bottom-controls">
-            <div className="progress-container">
-              <div className="progress-background">
-                <div className="progress-buffered" style={{ width: `${progressPercent}%` }} />
-              </div>
-              <Slider
-                className="progress-bar-slider"
-                value={currentTime}
-                max={duration || 100}
-                onChange={handleSeekChange}
-                onChangeComplete={handleSeekAfterChange}
-                onBeforeChange={handleSeekBeforeChange}
-                tooltip={{ formatter: formatTime }}
-                step={1}
-              />
+        {/* 底部控制栏 */}
+        <div className={`bottom-controls ${showControls ? '' : 'hidden'}`}>
+          {/* 进度条 */}
+          <div className="progress-container" ref={progressRef} onClick={handleProgressClick}>
+            <div className="progress-background">
+              <div className="progress-buffered" style={{ width: `${progressPercent}%` }} />
             </div>
-
-            <div className="control-buttons">
-              <Button type="text" icon={<StepBackwardOutlined />} onClick={prevVideo} size="large" />
-              <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(-10)} size="large" />
-              <Button type="primary" icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />} onClick={togglePlay} size="large" className="play-btn" />
-              <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(10)} size="large" />
-              <Button type="text" icon={<StepForwardOutlined />} onClick={nextVideo} size="large" />
-              <div className="volume-control">
-                <Button type="text" icon={isMuted ? <MutedOutlined /> : <SoundOutlined />} onClick={toggleMute} />
-                <Slider className="volume-slider" value={isMuted ? 0 : volume} max={1} step={0.1} onChange={handleVolumeChange} />
-              </div>
-              <Button type="text" icon={<span style={{ fontSize: 14, fontWeight: 'bold' }}>{playbackRate}x</span>} onClick={handlePlaybackRateChange} size="large" />
-              <Button type="text" icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />} onClick={toggleFullscreen} size="large" />
-            </div>
-
-            <div className="time-display">{formatTime(currentTime)} / {formatTime(duration)}</div>
+            <Slider
+              className="progress-bar-slider"
+              value={currentTime}
+              max={duration || 100}
+              onChange={handleSeekChange}
+              onChangeComplete={handleSeekAfterChange}
+              onBeforeChange={handleSeekBeforeChange}
+              tooltip={{ formatter: formatTime }}
+              step={1}
+            />
           </div>
-        )}
+
+          {/* 控制按钮 */}
+          <div className="control-buttons">
+            <Button type="text" icon={<StepBackwardOutlined />} onClick={prevVideo} size="large" />
+
+            {isMobileView ? (
+              // 移动端简化控制
+              <>
+                <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(-10)} size="large" />
+                <Button
+                  type="primary"
+                  icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                  onClick={togglePlay}
+                  size="large"
+                  className="play-btn"
+                />
+                <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(10)} size="large" />
+                <Button type="text" icon={<StepForwardOutlined />} onClick={nextVideo} size="large" />
+                <Button
+                  type="text"
+                  icon={isMuted ? <MutedOutlined /> : <SoundOutlined />}
+                  onClick={toggleMute}
+                  size="large"
+                />
+              </>
+            ) : (
+              // 桌面端完整控制
+              <>
+                <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(-10)} size="large" />
+                <Button
+                  type="primary"
+                  icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                  onClick={togglePlay}
+                  size="large"
+                  className="play-btn"
+                />
+                <Button type="text" icon={<ClockCircleOutlined />} onClick={() => skip(10)} size="large" />
+                <Button type="text" icon={<StepForwardOutlined />} onClick={nextVideo} size="large" />
+                <div className="volume-control">
+                  <Button type="text" icon={isMuted ? <MutedOutlined /> : <SoundOutlined />} onClick={toggleMute} />
+                  <Slider className="volume-slider" value={isMuted ? 0 : volume} max={1} step={0.1} onChange={handleVolumeChange} />
+                </div>
+                <Button
+                  type="text"
+                  icon={<span style={{ fontSize: 14, fontWeight: 'bold' }}>{playbackRate}x</span>}
+                  onClick={handlePlaybackRateChange}
+                  size="large"
+                />
+                <Button
+                  type="text"
+                  icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+                  onClick={toggleFullscreen}
+                  size="large"
+                />
+              </>
+            )}
+          </div>
+
+          <div className="time-display">{formatTime(currentTime)} / {formatTime(duration)}</div>
+        </div>
       </div>
 
-      <Modal open={showTags} title="编辑视频信息" onCancel={() => setShowTags(false)} onOk={handleSaveTags} width={600}>
+      {/* 标签编辑弹窗 */}
+      <Modal
+        open={showTags}
+        title="编辑视频信息"
+        onCancel={() => setShowTags(false)}
+        onOk={handleSaveTags}
+        width={isMobileView ? '90%' : 600}
+        centered
+      >
         <div className="edit-modal">
           <div className="form-item">
             <label>标题</label>

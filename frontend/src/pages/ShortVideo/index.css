@@ -20,6 +20,7 @@
 .empty-state h2 { font-size: 24px; margin-bottom: 16px; }
 .empty-state p { color: rgba(255, 255, 255, 0.7); margin-bottom: 24px; }
 
+/* 顶部导航栏 */
 .top-bar {
   position: absolute;
   top: 0;
@@ -30,8 +31,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
   z-index: 100;
+  transition: opacity 0.3s ease;
 }
 
 .back-btn { color: white; font-size: 16px; }
@@ -47,6 +49,7 @@
 
 .video-counter { color: rgba(255, 255, 255, 0.8); font-size: 14px; font-weight: 500; }
 
+/* 视频容器 - 桌面端 */
 .video-container {
   height: 100vh;
   width: 100vw;
@@ -62,13 +65,15 @@
   object-fit: contain;
 }
 
+/* 视频信息覆盖层 - 桌面端 */
 .video-overlay {
   position: absolute;
-  bottom: 120px;
+  bottom: 160px;
   left: 0;
-  right: 120px;
+  right: 140px;
   padding: 24px;
   z-index: 50;
+  pointer-events: none;
 }
 
 .video-info { color: white; }
@@ -91,18 +96,19 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-.video-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.video-tags { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
 .video-tags .ant-tag { font-size: 12px; padding: 4px 12px; border: none; }
 
+/* 右侧操作按钮 - 桌面端 */
 .action-buttons {
   position: absolute;
-  right: 16px;
-  bottom: 140px;
+  right: 24px;
+  bottom: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  z-index: 100;
+  z-index: 150;
 }
 
 .action-btn {
@@ -139,6 +145,26 @@
   color: #ff4d4f;
 }
 
+.action-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.delete-group .action-btn-text {
+  display: none;
+}
+
+.action-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.action-group.delete-group .action-btn-text {
+  display: none;
+}
+
 .video-stats {
   color: white;
   font-size: 13px;
@@ -147,6 +173,7 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
+/* 中央播放按钮 */
 .center-play-btn {
   position: absolute;
   top: 50%;
@@ -165,13 +192,14 @@
   transform: translate(-50%, -50%) scale(1.1);
 }
 
+/* 底部控制栏 - 桌面端 */
 .bottom-controls {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 16px 24px 24px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, transparent 100%);
+  padding: 20px 24px 28px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
   z-index: 100;
 }
 
@@ -291,37 +319,304 @@
 .edit-modal .form-item { display: flex; flex-direction: column; gap: 8px; }
 .edit-modal .form-item label { font-weight: 500; color: #333; }
 
+/* ========== 移动端优化 - 抖音风格竖屏9:16 ========== */
 @media (max-width: 768px) {
-  .top-bar { padding: 0 16px; height: 56px; }
-  .filter-controls { display: none; }
-  .video-counter { display: none; }
-  .video-overlay { bottom: 100px; left: 0; right: 80px; padding: 16px; }
-  .video-title { font-size: 16px; }
-  .video-description { font-size: 13px; }
-  .video-tags .ant-tag { font-size: 11px; padding: 3px 8px; }
-  .action-buttons { right: 8px; bottom: 120px; }
-  .action-btn { width: 48px; height: 48px; font-size: 20px; }
-  .video-stats { font-size: 12px; }
-  .bottom-controls { padding: 12px 16px 20px; }
-  .control-buttons { gap: 8px; }
-  .play-btn { width: 48px; height: 48px; font-size: 24px; }
-  .center-play-btn { font-size: 60px; }
-  .volume-control { padding: 6px 10px; }
-  .volume-slider { width: 60px; }
-  .time-display { font-size: 12px; }
-  .progress-bar-slider .ant-slider-handle { width: 12px; height: 12px; }
+  /* 顶部栏简化 */
+  .top-bar {
+    padding: env(safe-area-inset-top, 0) 8px 0;
+    height: 56px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+    flex-wrap: nowrap;
+  }
+  .top-bar .filter-controls {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+  }
+  .top-bar .video-counter {
+    display: block;
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* 视频容器 - 移动端全屏填充 */
+  .video-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .video-element {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  /* 视频信息 - 移动端底部左侧 */
+  .video-overlay {
+    position: absolute;
+    bottom: 140px;
+    left: 16px;
+    right: 100px;
+    padding: 0;
+    z-index: 50;
+  }
+
+  .video-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+
+  .video-description {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0 0 8px 0;
+    line-height: 1.5;
+    max-height: 60px;
+    -webkit-line-clamp: 2;
+  }
+
+  .video-tags { gap: 6px; }
+  .video-tags .ant-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(251, 114, 153, 0.8);
+  }
+
+  /* 右侧操作按钮 - 抖音风格垂直排列 */
+  .action-buttons {
+    position: absolute;
+    right: 8px;
+    bottom: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 150;
+  }
+
+  .action-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+
+  .action-btn-text {
+    color: white;
+    font-size: 11px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    margin-top: -4px;
+    margin-bottom: 8px;
+  }
+
+  .video-stats {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  /* 中央播放按钮 - 移动端 */
+  .center-play-btn {
+    font-size: 64px;
+  }
+
+  /* 底部控制栏 - 移动端简化 */
+  .bottom-controls {
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0));
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+  }
+
+  /* 进度条 - 移动端精简 */
+  .progress-container {
+    margin-bottom: 12px;
+    padding: 0 8px;
+  }
+
+  .progress-background {
+    height: 3px;
+  }
+
+  .progress-bar-slider .ant-slider-track {
+    height: 3px;
+  }
+
+  .progress-bar-slider .ant-slider-handle {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+    opacity: 1;
+    margin-top: -5px;
+  }
+
+  /* 控制按钮 - 移动端精简 */
+  .control-buttons {
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 0 4px;
+  }
+
+  .control-buttons .ant-btn {
+    min-width: 40px;
+    height: 40px;
+    padding: 0 8px;
+  }
+
+  .play-btn {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 24px;
+  }
+
+  /* 音量控制 - 移动端隐藏 */
+  .volume-control {
+    display: none;
+  }
+
+  /* 倍速和全屏 - 移动端简化 */
+  .control-buttons .playback-rate-btn,
+  .control-buttons .fullscreen-btn {
+    min-width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .time-display {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* 移动端侧边滑动手势提示 */
+  .swipe-hint {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .swipe-hint-icon {
+    width: 2px;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, white, transparent);
+    border-radius: 1px;
+  }
 }
 
+/* 超小屏幕优化 */
 @media (max-width: 375px) {
-  .video-title { font-size: 14px; }
-  .video-description { font-size: 12px; }
-  .action-btn { width: 44px; height: 44px; font-size: 18px; }
-  .play-btn { width: 44px; height: 44px; font-size: 22px; }
-  .center-play-btn { font-size: 50px; }
+  .video-overlay {
+    bottom: 130px;
+    right: 90px;
+  }
+
+  .video-title {
+    font-size: 14px;
+  }
+
+  .video-description {
+    font-size: 12px;
+    max-height: 50px;
+  }
+
+  .action-buttons {
+    right: 6px;
+    bottom: 130px;
+    gap: 10px;
+  }
+
+  .action-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  .action-btn-text {
+    font-size: 10px;
+  }
+
+  .control-buttons {
+    gap: 6px;
+  }
+
+  .control-buttons .ant-btn {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 6px;
+  }
+
+  .play-btn {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 22px;
+  }
+
+  .center-play-btn {
+    font-size: 56px;
+  }
 }
 
+/* 横屏模式优化 */
+@media (max-width: 768px) and (orientation: landscape) {
+  .video-element {
+    object-fit: contain;
+  }
+
+  .video-overlay {
+    bottom: 100px;
+    right: 140px;
+  }
+
+  .action-buttons {
+    right: 16px;
+    bottom: 100px;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .action-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .bottom-controls {
+    padding: 12px 16px;
+  }
+
+  .control-buttons {
+    gap: 16px;
+  }
+}
+
+/* 触摸设备优化 */
 @media (hover: none) and (pointer: coarse) {
-  .action-btn, .control-buttons .ant-btn { min-width: 56px; min-height: 56px; }
   .action-btn:active { transform: scale(0.95); }
-  .progress-bar-slider .ant-slider-handle { width: 20px; height: 20px; }
+  .progress-bar-slider .ant-slider-handle {
+    width: 18px;
+    height: 18px;
+    margin-top: -7px;
+  }
+}
+
+/* 隐藏滚动条 */
+.short-video-page::-webkit-scrollbar {
+  display: none;
 }

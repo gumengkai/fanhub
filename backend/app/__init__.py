@@ -1,5 +1,6 @@
 """Flask Application Factory"""
 
+import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -16,7 +17,13 @@ def create_app(config_class=Config):
 
     db.init_app(app)
 
-    CORS(app, origins=config_class.CORS_ORIGINS, supports_credentials=True)
+    # CORS configuration - allow all origins in production, specific in dev
+    cors_origins = config_class.CORS_ORIGINS
+    # If running in Docker/production, allow all origins (nginx handles security)
+    if os.environ.get('FLASK_ENV') == 'production':
+        CORS(app, supports_credentials=True)
+    else:
+        CORS(app, origins=cors_origins, supports_credentials=True)
 
     from app.routes.videos import videos_bp
     from app.routes.images import images_bp

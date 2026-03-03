@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from ..models import db, Video, Image, Source
+from ..models import db, Video, Image, Source, WatchHistory
 
 # Supported file extensions
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.webm'}
@@ -12,8 +12,10 @@ def scan_source(source):
     stats = {
         'videos_added': 0,
         'videos_updated': 0,
+        'videos_removed': 0,
         'images_added': 0,
         'images_updated': 0,
+        'images_removed': 0,
         'errors': []
     }
 
@@ -35,7 +37,7 @@ def scan_local_directory(source, stats, media_type='all'):
         stats['errors'].append(f"Path does not exist: {source.path}")
         return
 
-    # Get existing files to track deletions
+    # Get all existing files from database for this source
     if media_type in ('all', 'video'):
         existing_videos = {v.path: v for v in Video.query.filter_by(source_id=source.id).all()}
     if media_type in ('all', 'image'):
@@ -61,8 +63,29 @@ def scan_local_directory(source, stats, media_type='all'):
             elif media_type in ('all', 'image') and ext in IMAGE_EXTENSIONS:
                 process_image_file(file_path, source, existing_images if media_type != 'image' else {}, stats)
 
-    # Mark missing files (optional - could also delete them)
-    # For now, we keep them in the database but could add a 'missing' flag
+    # Remove database records for files that no longer exist on disk
+    if media_type in ('all', 'video'):
+        for path, video in existing_videos.items():
+            if path not in scanned_paths:
+                try:
+                    # Delete associated watch history first
+                    WatchHistory.query.filter_by(video_id=video.id).delete()
+                    # Delete the video record
+                    db.session.delete(video)
+                    stats['videos_removed'] = stats.get('videos_removed', 0) + 1
+                except Exception as e:
+                    stats['errors'].append(f"Error removing video record for {path}: {str(e)}")
+
+    if media_type in ('all', 'image'):
+        for path, image in existing_images.items():
+            if path not in scanned_paths:
+                try:
+                    db.session.delete(image)
+                    stats['images_removed'] = stats.get('images_removed', 0) + 1
+                except Exception as e:
+                    stats['errors'].append(f"Error removing image record for {path}: {str(e)}")
+
+    db.session.commit()
 
 
 def scan_nas_directory(source, stats):
