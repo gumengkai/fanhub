@@ -11,8 +11,11 @@
 ```bash
 cd /home/gmk/funhub
 
-# 1. 构建镜像
+# 1. 构建镜像（使用缓存）
 docker build -t funhub:latest .
+
+# 或完全重新构建（不使用缓存）
+docker build --no-cache -t funhub:latest .
 
 # 2. 打包为 tar 文件
 docker save -o funhub-latest.tar funhub:latest
@@ -40,9 +43,9 @@ docker save -o funhub-latest.tar funhub:latest
 
 - **镜像名称**: funhub:latest
 - **打包文件**: funhub-latest.tar
-- **大小**: 约 130-150MB
+- **大小**: 约 546MB (原始) / 133MB (压缩 tar)
 - **包含内容**:
-  - Python 3.13 运行时
+  - Python 3.12 运行时
   - Flask 后端应用
   - React 前端应用（已构建）
   - Nginx 反向代理
@@ -73,28 +76,40 @@ docker run -d \
 
 ## 当前版本
 
-- **代码版本**: 16c0d957 (2026-03-04)
-- **镜像版本**: funhub:latest (3bdffd4a866a)
+- **代码版本**: c9bfe858 (2026-03-04)
+- **镜像版本**: funhub:latest (e7b22ec625bd)
 - **镜像大小**: 546MB (压缩后 133MB)
 - **打包文件**: funhub-latest.tar
-
-## 打包信息
-
-```
-镜像 ID: 3bdffd4a866a
-打包时间：2026-03-04 23:07
-打包文件：funhub-latest.tar (133MB)
-包含层数：29 层
-```
-
-
-
-- **代码版本**: 5f95f890 (2026-03-04)
+- **打包时间**: 2026-03-04 23:21
 - **主要更新**:
   - 短视频模式优化（播放顺序/预加载）
   - Docker 单容器部署方案
   - Android 客户端支持
   - Bilibili 风格 UI
+
+## 打包信息
+
+```
+镜像 ID: sha256:e7b22ec625bd1d98b75ae5b6a3baedd4cfd232f601c629aebc5f511a79d466df
+打包时间：2026-03-04 23:21
+打包文件：funhub-latest.tar (133MB)
+包含层数：24 层
+构建方式：--no-cache 完全重新构建
+```
+
+## 验证镜像
+
+```bash
+# 运行测试容器
+docker run -d --name funhub-test --rm -p 8080:8080 funhub:latest
+
+# 等待启动后测试健康检查
+sleep 5
+curl http://localhost:8080/api/health
+
+# 停止测试容器
+docker stop funhub-test
+```
 
 ## 故障排除
 
@@ -112,3 +127,13 @@ docker run -d \
 1. 打开 Docker Desktop
 2. 设置 → Resources → WSL Integration
 3. 启用 Ubuntu 集成
+
+### 镜像构建失败
+
+```bash
+# 清理 Docker 缓存
+docker system prune -a
+
+# 重新构建
+docker build --no-cache --pull -t funhub:latest .
+```
