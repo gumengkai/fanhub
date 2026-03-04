@@ -40,6 +40,63 @@
   z-index: 10;
 }
 
+.video-error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 15;
+  padding: 24px;
+  text-align: center;
+}
+
+.video-error-overlay .error-icon {
+  font-size: 64px;
+  color: #fb7299;
+  margin-bottom: 16px;
+}
+
+.video-error-overlay .error-title {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.video-error-overlay .error-message {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin-bottom: 16px;
+  max-width: 400px;
+}
+
+.video-error-overlay .download-btn {
+  background: linear-gradient(135deg, #fb7299 0%, #ff9a9e 100%);
+  border: none;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.video-error-overlay .download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(251, 114, 153, 0.4);
+}
+
 .loading-spinner {
   width: 60px;
   height: 60px;

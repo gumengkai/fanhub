@@ -8,7 +8,6 @@ import {
   Button,
   message,
   Empty,
-  Switch,
   Tag,
 } from 'antd'
 import {
@@ -18,6 +17,7 @@ import {
   PlayCircleOutlined,
   FilterOutlined,
   TagsOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons'
 import { videosApi, tagsApi } from '@services/api'
 import MediaGrid from '@components/MediaGrid'
@@ -40,7 +40,7 @@ function VideoLibrary() {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState('desc')
   const [searchQuery, setSearchQuery] = useState('')
-  const [favoriteOnly, setFavoriteOnly] = useState(false)
+  const [filterType, setFilterType] = useState('all') // 'all' | 'favorite' | 'unwatched'
   const [selectedTag, setSelectedTag] = useState(null)
 
   // Fetch all tags for filter dropdown
@@ -67,8 +67,10 @@ function VideoLibrary() {
         order: sortOrder,
         search: searchQuery || searchParams.get('search') || '',
       }
-      if (favoriteOnly) {
+      if (filterType === 'favorite') {
         params.favorite = true
+      } else if (filterType === 'unwatched') {
+        params.unwatched = true
       }
       if (selectedTag) {
         params.tag_id = selectedTag
@@ -87,7 +89,7 @@ function VideoLibrary() {
     } finally {
       setLoading(false)
     }
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, favoriteOnly, selectedTag])
+  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, filterType, selectedTag])
 
   useEffect(() => {
     fetchVideos()
@@ -142,7 +144,17 @@ function VideoLibrary() {
   }
 
   const handlePlay = (video) => {
-    navigate(`/videos/${video.id}`)
+    // 传递当前列表的筛选条件到播放页面，用于上一个/下一个导航
+    const listContext = {
+      sortBy,
+      sortOrder,
+      searchQuery,
+      filterType,
+      selectedTag,
+      page: pagination.current,
+      pageSize: pagination.pageSize,
+    }
+    navigate(`/videos/${video.id}`, { state: { listContext } })
   }
 
   const handlePlayByTag = () => {
@@ -205,16 +217,23 @@ function VideoLibrary() {
             ))}
           </Select>
 
-          <Space>
-            <FilterOutlined />
-            <Switch
-              checked={favoriteOnly}
-              onChange={setFavoriteOnly}
-              checkedChildren="收藏"
-              unCheckedChildren="全部"
-              size="small"
-            />
-          </Space>
+          <Select
+            value={filterType}
+            onChange={(value) => {
+              setFilterType(value)
+              setPagination({ ...pagination, current: 1 })
+            }}
+            style={{ width: 130 }}
+            placeholder={<><FilterOutlined /> 筛选</>}
+          >
+            <Option value="all">全部视频</Option>
+            <Option value="favorite">
+              <HeartFilled style={{ color: '#fb7299', marginRight: 4 }} />已收藏
+            </Option>
+            <Option value="unwatched">
+              <EyeInvisibleOutlined style={{ marginRight: 4 }} />未观看
+            </Option>
+          </Select>
 
           <Button
             type="primary"

@@ -4,7 +4,8 @@
 
 创建一个现代化的娱乐中心应用，参考主流视频网站设计，支持视频库和图片库管理，数据来源支持本地文件系统和 NAS。
 
-**2026-03-01 最新更新**: 新增抖音风格短视频模式、图片幻灯片播放、播放历史记录、Bilibili 风格 UI 优化
+**2026-03-03 最新更新**: Docker 单容器部署方案、Android 客户端支持、NAS 部署优化
+**2026-03-01 更新**: 新增抖音风格短视频模式、图片幻灯片播放、播放历史记录、Bilibili 风格 UI 优化
 
 ## 技术栈
 
@@ -64,11 +65,21 @@ funhub/
 │   │   └── main.jsx           # Bilibili 主题配置 ⭐
 │   ├── package.json
 │   └── vite.config.js
+├── scripts/                    # 启动脚本 ⭐新增
+│   ├── start-dev.sh           # 开发模式启动（前后端）
+│   ├── start-backend.sh       # 仅后端
+│   └── start-frontend.sh      # 仅前端
 ├── storage/                    # 数据存储
 │   ├── thumbnails/            # 缩略图缓存
 │   └── database/              # SQLite 数据库
-├── docker-compose.yml
-└── *.sh                       # 启动脚本
+├── Dockerfile                  # 单容器构建 ⭐新增
+├── nginx-single.conf           # Nginx 配置 ⭐新增
+├── supervisord.conf            # 进程管理配置 ⭐新增
+├── deploy.sh                   # 一键部署脚本 ⭐新增
+├── status.sh                   # 状态检查脚本
+├── DEPLOY.md                   # Docker 部署文档 ⭐新增
+├── NAS-DEPLOY.md               # NAS 部署文档 ⭐新增
+└── DEVELOPMENT.md              # 开发环境指南 ⭐新增
 ```
 
 ## 已实现功能
@@ -277,35 +288,97 @@ funhub/
 
 ## 启动命令
 
-### 后端
+### Docker 部署（推荐）⭐新增
+
+```bash
+# 一键部署
+chmod +x deploy.sh
+./deploy.sh
+
+# 访问 http://localhost:8080
+```
+
+详细部署文档请参考 [DEPLOY.md](./DEPLOY.md) 和 [NAS-DEPLOY.md](./NAS-DEPLOY.md)
+
+### 开发模式
+
+```bash
+# 一键启动前后端
+./scripts/start-dev.sh
+
+# 或分别启动
+./scripts/start-backend.sh   # 仅后端
+./scripts/start-frontend.sh  # 仅前端
+```
+
+详细开发指南请参考 [DEVELOPMENT.md](./DEVELOPMENT.md)
+
+### 手动启动
+
+#### 后端
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python migrate.py  # 运行数据库迁移 ⭐新增
+python migrate.py  # 运行数据库迁移
 python run.py
 ```
 
-### 前端
+#### 前端
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### 一键启动脚本
-```bash
-./start-all.sh      # 启动前后端
-./stop-all.sh       # 停止所有服务
-./status.sh         # 查看服务状态
-```
-
 ## 访问地址
 
+### 开发模式
 - 前端：http://localhost:5173
 - 后端：http://localhost:5000
 - API Health: http://localhost:5000/api/health
+
+### Docker 部署
+- Web 界面：http://localhost:8080
+- API：http://localhost:8080/api/
+- 后端直连：http://localhost:5000 （Android 客户端）⭐新增
+
+## Android 客户端支持 ⭐新增
+
+### 端口配置
+Docker 镜像暴露两个端口：
+
+| 端口 | 服务 | 用途 |
+|------|------|------|
+| 8080 | Nginx | Web 界面 + API 代理 |
+| 5000 | Flask | 后端 API（移动端直连）|
+
+### Android 客户端连接
+
+**方式一：通过 Nginx 代理（推荐）**
+```
+API 地址：http://<服务器IP>:8080/api/
+```
+
+**方式二：直接连接后端**
+```
+API 地址：http://<服务器IP>:5000/api/
+```
+
+### 启动容器（双端口映射）
+
+```bash
+docker run -d \
+    --name funhub \
+    --restart unless-stopped \
+    -p 8080:8080 \
+    -p 5000:5000 \
+    -v "$(pwd)/storage:/app/storage" \
+    -v /media:/media:ro \
+    -e CORS_ORIGINS="http://localhost:5173,http://<NAS IP>:8080,http://<NAS IP>:5000" \
+    funhub:latest
+```
 
 ## 页面路由
 
@@ -316,6 +389,45 @@ npm run dev
 - `/images` - 图片库 (支持幻灯片播放) ⭐
 - `/sources` - 来源配置
 - `/favorites` - 我的收藏
+
+## Android 客户端支持 ⭐新增
+
+### 双端口暴露
+
+Docker 镜像暴露两个端口：
+
+| 端口 | 服务 | 用途 |
+|------|------|------|
+| `8080` | Nginx | Web 界面 + API 代理 |
+| `5000` | Flask | 后端 API（移动端直连） |
+
+### 连接方式
+
+**方式一：通过 Nginx 代理（推荐）**
+```
+API 地址：http://<NAS IP>:8080/api/
+```
+
+**方式二：直接连接后端**
+```
+API 地址：http://<NAS IP>:5000/api/
+```
+
+### Docker 启动（双端口映射）
+
+```bash
+docker run -d \
+    --name funhub \
+    --restart unless-stopped \
+    -p 8080:8080 \
+    -p 5000:5000 \
+    -v "$(pwd)/storage:/app/storage" \
+    -v /media:/media:ro \
+    -e CORS_ORIGINS="http://localhost:5173,http://<NAS IP>:8080,http://<NAS IP>:5000" \
+    funhub:latest
+```
+
+详细配置请参考 [NAS-DEPLOY.md](./NAS-DEPLOY.md)
 
 ## 性能优化
 
@@ -345,6 +457,14 @@ npm run dev
 - [ ] 字幕支持
 
 ## 更新日志
+
+### 2026-03-03
+- ✨ Docker 单容器部署方案（前后端一体化）
+- ✨ Android 客户端支持（后端 5000 端口直连）
+- ✨ 新增一键部署脚本 (deploy.sh)
+- ✨ 新增开发模式启动脚本 (scripts/)
+- ✨ NAS 部署文档优化
+- 🐛 修复 CORS 跨域配置
 
 ### 2026-03-01
 - ✨ 新增抖音风格短视频模式 (`/short-video`)

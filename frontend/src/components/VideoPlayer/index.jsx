@@ -37,20 +37,41 @@ function VideoPlayer({ video, onProgressUpdate }) {
   const controlsTimeoutRef = useRef(null)
   const saveProgressRef = useRef(null)
   const [isDragging, setIsDragging] = useState(false)
+  const savedPositionRef = useRef(0)
+  const [error, setError] = useState(null)
+
+  // Check if video format is supported
+  const isFormatSupported = (filename) => {
+    if (!filename) return false
+    const ext = filename.split('.').pop().toLowerCase()
+    const supportedFormats = ['mp4', 'webm', 'ogv', 'ogg', 'mov', 'm4v']
+    return supportedFormats.includes(ext)
+  }
 
   // Load saved progress
   useEffect(() => {
     if (video?.id) {
+      // Reset saved position and error when video changes
+      savedPositionRef.current = 0
+      setError(null)
+
+      // Check format support
+      if (!isFormatSupported(video.path)) {
+        setError(`不支持的格式: ${video.path?.split('.').pop()?.toUpperCase() || '未知'}`)
+        setLoading(false)
+        return
+      }
+
       fetch(`/api/videos/${video.id}/history`)
         .then(res => res.json())
         .then(data => {
-          if (data.playback_position && data.playback_position > 0 && data.playback_position < duration * 0.95) {
-            setCurrentTime(data.playback_position)
+          if (data.playback_position && data.playback_position > 0) {
+            savedPositionRef.current = data.playback_position
           }
         })
         .catch(() => {})
     }
-  }, [video?.id])
+  }, [video?.id, video?.path])
 
   useEffect(() => {
     const video = videoRef.current
@@ -68,6 +89,11 @@ function VideoPlayer({ video, onProgressUpdate }) {
     const handleLoadedMetadata = () => {
       setDuration(video.duration)
       setLoading(false)
+      // Apply saved playback position after metadata is loaded
+      if (savedPositionRef.current > 0 && savedPositionRef.current < video.duration * 0.95) {
+        video.currentTime = savedPositionRef.current
+        setCurrentTime(savedPositionRef.current)
+      }
     }
     const handlePlay = () => setIsPlaying(true)
     const handlePause = () => setIsPlaying(false)
@@ -77,6 +103,11 @@ function VideoPlayer({ video, onProgressUpdate }) {
     }
     const handleWaiting = () => setLoading(true)
     const handleCanPlay = () => setLoading(false)
+    const handleError = (e) => {
+      setLoading(false)
+      setError('视频加载失败，可能是不支持的格式')
+      console.error('Video error:', e)
+    }
 
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
@@ -227,6 +258,28 @@ function VideoPlayer({ video, onProgressUpdate }) {
   }
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  if (error) {
+    return (
+      <div ref={containerRef} className="video-player-container" data-video-id={video?.id}>
+        <div className="video-error-overlay">
+          <div className="error-icon">⚠️</div>
+          <div className="error-title">无法播放此视频</div>
+          <div className="error-message">{error}</div>
+          <div className="error-message" style={{fontSize: '12px', marginTop: '8px'}}>
+            支持的格式: MP4, WebM, MOV, OGV, M4V
+          </div>
+          <a
+            href={`/api/videos/${video?.id}/stream`}
+            download={video?.title}
+            className="download-btn"
+          >
+            下载视频
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div ref={containerRef} className={`video-player-container ${isFullscreen ? 'fullscreen' : ''}`} data-video-id={video?.id}>

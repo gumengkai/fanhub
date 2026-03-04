@@ -42,6 +42,7 @@ def get_videos():
     source_id = request.args.get('source_id', type=int)
     tag_id = request.args.get('tag_id', type=int)
     favorite = request.args.get('favorite')
+    unwatched = request.args.get('unwatched')
 
     query = Video.query
 
@@ -59,6 +60,12 @@ def get_videos():
         is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
         query = query.filter(Video.is_favorite == is_fav)
 
+    if unwatched is not None:
+        # 筛选从未观看的视频（没有观看历史记录）
+        is_unwatched = str(unwatched).lower() in ('true', '1', 'yes', 'on')
+        if is_unwatched:
+            query = query.outerjoin(WatchHistory).filter(WatchHistory.id == None)
+
     if sort_by == 'view_count':
         sort_column = Video.view_count
     elif sort_by == 'duration':
@@ -69,7 +76,7 @@ def get_videos():
         sort_column = Video.title
     else:
         sort_column = Video.created_at
-    
+
     if order == 'desc':
         query = query.order_by(desc(sort_column))
     else:

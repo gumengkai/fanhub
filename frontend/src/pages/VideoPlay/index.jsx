@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Typography,
   Button,
@@ -16,6 +16,7 @@ import {
   Spin,
   Progress,
   Input,
+  Tooltip,
 } from 'antd'
 import {
   HeartOutlined,
@@ -29,6 +30,9 @@ import {
   VideoCameraOutlined,
   EyeOutlined,
   HistoryOutlined,
+  StepBackwardOutlined,
+  StepForwardOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons'
 import { videosApi } from '@services/api'
 import VideoPlayer from '@components/VideoPlayer'
@@ -42,12 +46,18 @@ const { TextArea } = Input
 function VideoPlay() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [video, setVideo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [editedDescription, setEditedDescription] = useState('')
   const [watchProgress, setWatchProgress] = useState({ position: 0, completed: false })
+
+  // 上一个/下一个视频导航状态
+  const [listContext, setListContext] = useState(null)
+  const [adjacentVideos, setAdjacentVideos] = useState({ prev: null, next: null })
+  const [navLoading, setNavLoading] = useState(false)
 
   const fetchVideo = useCallback(async () => {
     setLoading(true)
@@ -56,7 +66,7 @@ function VideoPlay() {
       setVideo(response)
       setEditedTitle(response.title)
       setEditedDescription(response.description || '')
-      
+
       // Fetch watch history
       try {
         const historyRes = await fetch(`/api/history/video/${id}`)
@@ -77,9 +87,111 @@ function VideoPlay() {
     }
   }, [id])
 
+  // 获取相邻视频（上一个/下一个）
+  const fetchAdjacentVideos = useCallback(async () => {
+    if (!listContext) return
+
+    setNavLoading(true)
+    try {
+      const params = {
+        page: 1,
+        per_page: 1000, // 获取足够多的视频来找到当前视频的位置
+        sort_by: listContext.sortBy,
+        order: listContext.sortOrder,
+        search: listContext.searchQuery || '',
+      }
+      if (listContext.favoriteOnly) {
+        params.favorite = true
+      }
+      if (listContext.selectedTag) {
+        params.tag_id = listContext.selectedTag
+      }
+
+      const response = await videosApi.getList(params)
+      const videos = response.items || []
+
+      // 找到当前视频在列表中的索引
+      const currentIndex = videos.findIndex(v => v.id === parseInt(id))
+
+      if (currentIndex !== -1) {
+        setAdjacentVideos({
+          prev: currentIndex > 0 ? videos[currentIndex - 1] : null,
+          next: currentIndex < videos.length - 1 ? videos[currentIndex + 1] : null
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch adjacent videos:', error)
+    } finally {
+      setNavLoading(false)
+    }
+  }, [listContext, id])
+
+  // 从 location state 获取列表上下文
+  useEffect(() => {
+    if (location.state?.listContext) {
+      setListContext(location.state.listContext)
+    }
+  }, [location.state])
+
+  // 当列表上下文或视频ID变化时，获取相邻视频
+  useEffect(() => {
+    fetchAdjacentVideos()
+  }, [fetchAdjacentVideos])
+
+  // 获取视频信息
   useEffect(() => {
     fetchVideo()
   }, [fetchVideo])
+
+  // 导航到上一个/下一个视频
+  const handleNavigate = (direction) => {
+    const targetVideo = direction === 'prev' ? adjacentVideos.prev : adjacentVideos.next
+    if (targetVideo && listContext) {
+      navigate(`/videos/${targetVideo.id}`, {
+        state: { listContext }
+      })
+    }
+  }
+
+  // 键盘快捷键支持
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // 只有当没有在输入框中输入时才处理
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          if (e.altKey && adjacentVideos.prev) {
+            e.preventDefault()
+            handleNavigate('prev')
+          }
+          break
+        case 'ArrowRight':
+          if (e.altKey && adjacentVideos.next) {
+            e.preventDefault()
+            handleNavigate('next')
+          }
+          break
+        case 'p':
+        case 'P':
+          if (adjacentVideos.prev) {
+            handleNavigate('prev')
+          }
+          break
+        case 'n':
+        case 'N':
+          if (adjacentVideos.next) {
+            handleNavigate('next')
+          }
+          break
+        default:
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [adjacentVideos, listContext])
 
   const handleFavorite = async () => {
     try {
@@ -184,13 +296,38 @@ function VideoPlay() {
 
   return (
     <div className="video-play-page">
-      <Button
-        icon={<LeftOutlined />}
-        onClick={() => navigate('/videos')}
-        className="back-button"
-      >
-        返回视频库
-      </Button>
+      <div className="video-nav-header">
+        <Button
+          icon={<LeftOutlined />}
+          onClick={() => navigate('/videos')}
+          className="back-button"
+        >
+          返回视频库
+        </Button>
+
+        <Space className="nav-controls">
+          <Tooltip title="上一个视频 (Alt + ← 或 P)">
+            <Button
+              icon={<StepBackwardOutlined />}
+              onClick={() => handleNavigate('prev')}
+              disabled={!adjacentVideos.prev}
+              loading={navLoading}
+            >
+              上一个
+            </Button>
+          </Tooltip>
+          <Tooltip title="下一个视频 (Alt + → 或 N)">
+            <Button
+              icon={<StepForwardOutlined />}
+              onClick={() => handleNavigate('next')}
+              disabled={!adjacentVideos.next}
+              loading={navLoading}
+            >
+              下一个
+            </Button>
+          </Tooltip>
+        </Space>
+      </div>
 
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={16}>

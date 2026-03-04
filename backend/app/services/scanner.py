@@ -2,8 +2,8 @@ import os
 from datetime import datetime
 from ..models import db, Video, Image, Source, WatchHistory
 
-# Supported file extensions
-VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.webm'}
+# Supported file extensions (browser-compatible formats only)
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.m4v', '.webm', '.ogv', '.ogg'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif'}
 
 

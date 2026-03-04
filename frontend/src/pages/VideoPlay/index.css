@@ -11,8 +11,16 @@
   min-height: 500px;
 }
 
-.back-button {
+.video-nav-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.back-button {
   border: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
@@ -21,6 +29,22 @@
 .back-button:hover {
   transform: translateX(-4px);
   box-shadow: 0 4px 12px rgba(251, 114, 153, 0.3);
+}
+
+.nav-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-controls .ant-btn {
+  transition: all 0.3s ease;
+}
+
+.nav-controls .ant-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(251, 114, 153, 0.3);
+  border-color: #fb7299;
+  color: #fb7299;
 }
 
 .progress-card {
@@ -241,52 +265,67 @@
   .video-play-page {
     padding: 12px;
   }
-  
+
   .video-play-loading {
     min-height: 300px;
   }
-  
+
+  .video-nav-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
   .back-button {
-    margin-bottom: 12px;
+    margin-bottom: 0;
     font-size: 13px;
     padding: 4px 12px;
   }
-  
+
+  .nav-controls {
+    justify-content: center;
+  }
+
+  .nav-controls .ant-btn {
+    flex: 1;
+    min-height: 40px;
+  }
+
   .video-title {
     font-size: 18px;
   }
-  
+
   .video-description {
     font-size: 13px;
     padding: 10px 12px;
   }
-  
+
   .video-info-card {
     margin-top: 16px;
   }
-  
+
   .related-videos-card {
     position: static;
     margin-top: 16px;
   }
-  
+
   .related-video-item {
     padding: 10px;
   }
-  
+
   .related-video-thumb {
     width: 100px;
     height: 56px;
   }
-  
+
   .related-video-title {
     font-size: 13px;
   }
-  
+
   .ant-descriptions .ant-descriptions-row > td {
     padding-bottom: 8px;
   }
-  
+
   .ant-descriptions-item-label,
   .ant-descriptions-item-content {
     font-size: 12px;
