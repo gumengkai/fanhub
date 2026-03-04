@@ -11,16 +11,19 @@
 ```bash
 cd /home/gmk/funhub
 
-# 1. 构建镜像（使用缓存）
+# 1. 确保使用最新代码
+git pull origin master
+
+# 2. 构建镜像（使用缓存）
 docker build -t funhub:latest .
 
 # 或完全重新构建（不使用缓存）
 docker build --no-cache -t funhub:latest .
 
-# 2. 打包为 tar 文件
+# 3. 打包为 tar 文件
 docker save -o funhub-latest.tar funhub:latest
 
-# 3. 验证打包文件
+# 4. 验证打包文件
 ls -lh funhub-latest.tar
 tar -tvf funhub-latest.tar | head -10
 ```
@@ -76,11 +79,11 @@ docker run -d \
 
 ## 当前版本
 
-- **代码版本**: c9bfe858 (2026-03-04)
-- **镜像版本**: funhub:latest (e7b22ec625bd)
+- **代码版本**: e8a619de (2026-03-04)
+- **镜像版本**: funhub:latest (bf8b53552da4)
 - **镜像大小**: 546MB (压缩后 133MB)
 - **打包文件**: funhub-latest.tar
-- **打包时间**: 2026-03-04 23:21
+- **打包时间**: 2026-03-04 23:35
 - **主要更新**:
   - 短视频模式优化（播放顺序/预加载）
   - Docker 单容器部署方案
@@ -90,8 +93,8 @@ docker run -d \
 ## 打包信息
 
 ```
-镜像 ID: sha256:e7b22ec625bd1d98b75ae5b6a3baedd4cfd232f601c629aebc5f511a79d466df
-打包时间：2026-03-04 23:21
+镜像 ID: sha256:bf8b53552da40b602b9c04c284c0586a45f7319e2b8d16899f4b7dcb8b02128b
+打包时间：2026-03-04 23:35
 打包文件：funhub-latest.tar (133MB)
 包含层数：24 层
 构建方式：--no-cache 完全重新构建
@@ -137,3 +140,31 @@ docker system prune -a
 # 重新构建
 docker build --no-cache --pull -t funhub:latest .
 ```
+
+### 部署后代码不一致
+
+如果部署后的镜像与最新代码不一致，请检查：
+
+1. **确认使用最新的 tar 文件**
+   ```bash
+   ls -lh funhub-latest.tar
+   # 检查文件时间是否是最新的
+   ```
+
+2. **重新构建镜像**
+   ```bash
+   docker build --no-cache -t funhub:latest .
+   docker save -o funhub-latest.tar funhub:latest
+   ```
+
+3. **验证镜像内容**
+   ```bash
+   # 检查镜像中的代码
+   docker run --rm funhub:latest cat /app/backend/app/routes/videos.py | head -20
+   ```
+
+4. **清理旧镜像**
+   ```bash
+   docker rmi funhub:latest
+   docker load -i funhub-latest.tar
+   ```
