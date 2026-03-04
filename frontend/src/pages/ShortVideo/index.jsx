@@ -60,6 +60,8 @@ function ShortVideo() {
   const touchStartRef = useRef(null)
   const saveProgressRef = useRef(null)
   const progressRef = useRef(null)
+  const nextVideoRef = useRef(null)
+  const prevVideoRef = useRef(null)
 
   // 检测移动设备
   useEffect(() => {
@@ -76,7 +78,19 @@ function ShortVideo() {
 
   const fetchAllVideos = async () => {
     try {
-      const response = await fetch('/api/videos?per_page=500')
+      // 先获取第一页以知道总数
+      const firstResponse = await fetch('/api/videos?per_page=1')
+      const firstData = await firstResponse.json()
+      const total = firstData.total || 0
+
+      if (total === 0) {
+        setAllVideos([])
+        setPlaylist([])
+        return
+      }
+
+      // 获取全部视频
+      const response = await fetch(`/api/videos?per_page=${total}`)
       const data = await response.json()
       const videos = data.items || []
       setAllVideos(videos)
@@ -157,7 +171,7 @@ function ShortVideo() {
     const handleLoadedMetadata = () => setDuration(video.duration)
     const handlePlay = () => setIsPlaying(true)
     const handlePause = () => setIsPlaying(false)
-    const handleEnded = () => nextVideo()
+    const handleEnded = () => nextVideoRef.current?.()
 
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
@@ -177,8 +191,8 @@ function ShortVideo() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       switch (e.key) {
-        case 'ArrowUp': e.preventDefault(); prevVideo(); break
-        case 'ArrowDown': e.preventDefault(); nextVideo(); break
+        case 'ArrowUp': e.preventDefault(); prevVideoRef.current?.(); break
+        case 'ArrowDown': e.preventDefault(); nextVideoRef.current?.(); break
         case ' ': e.preventDefault(); togglePlay(); break
         case 'ArrowLeft': skip(-10); break
         case 'ArrowRight': skip(10); break
@@ -221,26 +235,55 @@ function ShortVideo() {
     }
   }
 
-  const nextVideo = () => {
+  const nextVideo = useCallback(() => {
     if (playlist.length === 0) return
+    let nextIndex
     if (isRandom) {
-      let nextIndex
+      // 在全部视频中随机选择（不重复当前）
       do { nextIndex = Math.floor(Math.random() * playlist.length) }
       while (nextIndex === currentIndex && playlist.length > 1)
-      setCurrentIndex(nextIndex)
     } else {
-      setCurrentIndex((prev) => (prev + 1) % playlist.length)
+      // 顺序播放，循环到开头
+      nextIndex = (currentIndex + 1) % playlist.length
     }
+    setCurrentIndex(nextIndex)
     setIsPlaying(true)
-    setTimeout(() => videoRef.current?.play(), 100)
-  }
+    // 预加载下一个视频
+    const nextNextIndex = isRandom
+      ? Math.floor(Math.random() * playlist.length)
+      : (nextIndex + 1) % playlist.length
+    if (playlist[nextNextIndex]) {
+      preloadVideo(playlist[nextNextIndex])
+    }
+  }, [playlist, currentIndex, isRandom])
 
-  const prevVideo = () => {
+  const prevVideo = useCallback(() => {
     if (playlist.length === 0) return
-    setCurrentIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
+    let prevIndex
+    if (isRandom) {
+      // 随机模式下也随机选择上一个
+      do { prevIndex = Math.floor(Math.random() * playlist.length) }
+      while (prevIndex === currentIndex && playlist.length > 1)
+    } else {
+      // 顺序播放
+      prevIndex = (currentIndex - 1 + playlist.length) % playlist.length
+    }
+    setCurrentIndex(prevIndex)
     setIsPlaying(true)
-    setTimeout(() => videoRef.current?.play(), 100)
-  }
+  }, [playlist, currentIndex, isRandom])
+
+  // 更新 ref
+  useEffect(() => {
+    nextVideoRef.current = nextVideo
+    prevVideoRef.current = prevVideo
+  }, [nextVideo, prevVideo])
+
+  // 切换视频后自动播放
+  useEffect(() => {
+    if (isPlaying && videoRef.current) {
+      videoRef.current.play().catch(() => {})
+    }
+  }, [currentIndex])
 
   const skip = (seconds) => {
     if (videoRef.current) {
