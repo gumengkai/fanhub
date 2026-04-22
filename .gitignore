@@ -66,3 +66,19 @@ Thumbs.db
 
 # Claude
 .claude/settings.local.json
+.claude/
+
+# Android
+android/.gradle/
+android/app/build/
+android/*.iml
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+*.apk
+*.aab
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
