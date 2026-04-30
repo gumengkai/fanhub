@@ -16,7 +16,6 @@ data class Video(
     val isLiked: Boolean = false,
     val description: String? = null,
     val viewCount: Int = 0,
-    val tags: List<Tag> = emptyList(),
     val createdAt: String? = null
 ) {
     fun getThumbnailUrl(baseUrl: String): String {
@@ -27,13 +26,6 @@ data class Video(
         return "$baseUrl/api/douyin/$id/stream"
     }
 }
-
-data class Tag(
-    val id: Int,
-    val name: String,
-    val color: String = "#FE2C55",
-    val videoCount: Int = 0
-)
 
 data class VideoListResponse(
     val items: List<Video>,

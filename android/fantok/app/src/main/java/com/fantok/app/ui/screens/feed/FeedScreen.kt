@@ -363,24 +363,8 @@ fun FeedScreen(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White,
-                        maxLines = 2,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        maxLines = 2
                     )
-
-                    // 标签
-                    if (currentVideo.tags.isNotEmpty()) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            currentVideo.tags.take(3).forEach { tag ->
-                                Text(
-                                    "#${tag.name}",
-                                    fontSize = 13.sp,
-                                    color = Color.White.copy(alpha = 0.85f)
-                                )
-                            }
-                        }
-                    }
                 }
             }
 

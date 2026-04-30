@@ -17,8 +17,7 @@ interface ApiService {
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 50,
         @Query("liked") liked: Boolean? = null,
-        @Query("favorite") favorite: Boolean? = null,
-        @Query("tag_id") tagId: Int? = null
+        @Query("favorite") favorite: Boolean? = null
     ): VideoListResponse
 
     @GET("api/douyin/{id}")
@@ -35,9 +34,6 @@ interface ApiService {
 
     @GET("api/douyin/stats")
     suspend fun getDouyinStats(): DouyinStats
-
-    @GET("api/tags")
-    suspend fun getTags(): List<com.fantok.app.data.model.Tag>
 
     @GET("api/health")
     suspend fun healthCheck(): Response<Map<String, String>>
