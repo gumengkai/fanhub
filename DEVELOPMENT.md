@@ -1,4 +1,4 @@
-# FunHub 开发环境指南
+# fanhub 开发环境指南
 
 🛠️ **开发模式启动** - 前后端分离，支持热重载
 
@@ -7,7 +7,7 @@
 ## 📁 项目结构
 
 ```
-funhub/
+fanhub/
 ├── backend/              # Flask 后端
 │   ├── app/             # 应用代码
 │   ├── run.py           # 入口文件
@@ -37,7 +37,7 @@ funhub/
 同时启动前端和后端服务：
 
 ```bash
-cd /home/gmk/funhub
+cd /home/gmk/fanhub
 ./scripts/start-dev.sh
 ```
 
@@ -173,7 +173,7 @@ kill -9 <PID>
 
 ```bash
 # 删除数据库重新初始化
-rm storage/database/funhub.db
+rm storage/database/fanhub.db
 
 # 重启后端，会自动创建新数据库
 ./scripts/start-backend.sh
@@ -222,7 +222,7 @@ rm storage/database/funhub.db
 | 变量 | 值 | 说明 |
 |------|-----|------|
 | `FLASK_ENV` | `development` | Flask 开发模式 |
-| `DATABASE_PATH` | `./storage/database/funhub.db` | 本地数据库 |
+| `DATABASE_PATH` | `./storage/database/fanhub.db` | 本地数据库 |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | 允许跨域 |
 | `SECRET_KEY` | `dev-secret-key...` | 开发密钥 |
 

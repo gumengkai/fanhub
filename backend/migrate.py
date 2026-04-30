@@ -1,4 +1,4 @@
-"""Database Migration Script for FunHub"""
+"""Database Migration Script for fanhub"""
 
 import sys
 import os
@@ -65,7 +65,7 @@ def migrate():
         
         # Check images table
         image_columns = [col['name'] for col in inspector.get_columns('images')]
-        
+
         if 'view_count' not in image_columns:
             print("✨ Adding view_count to images table...")
             with db.engine.connect() as conn:
@@ -74,12 +74,33 @@ def migrate():
             print("✅ view_count column added")
         else:
             print("✅ view_count column exists")
+
+        # Add is_liked column to videos table
+        if 'is_liked' not in video_columns:
+            print("✨ Adding is_liked to videos table...")
+            with db.engine.connect() as conn:
+                conn.execute(db.text("ALTER TABLE videos ADD COLUMN is_liked BOOLEAN DEFAULT 0"))
+                conn.commit()
+            print("✅ is_liked column added to videos")
+        else:
+            print("✅ is_liked column exists in videos")
+
+        # Add is_liked column to images table
+        if 'is_liked' not in image_columns:
+            print("✨ Adding is_liked to images table...")
+            with db.engine.connect() as conn:
+                conn.execute(db.text("ALTER TABLE images ADD COLUMN is_liked BOOLEAN DEFAULT 0"))
+                conn.commit()
+            print("✅ is_liked column added to images")
+        else:
+            print("✅ is_liked column exists in images")
         
         print("\n✅ Migration completed successfully!")
         print("\n📋 Summary:")
         print("  - Sources can now be configured for video-only, image-only, or all media")
         print("  - Video and image scanning is now separated by source media_type")
         print("  - Existing sources default to 'all' (backward compatible)")
+        print("  - Added is_liked column to videos and images (likes feature)")
 
 if __name__ == '__main__':
     migrate()

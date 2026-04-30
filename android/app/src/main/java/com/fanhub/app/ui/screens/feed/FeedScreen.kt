@@ -76,6 +76,11 @@ fun FeedScreen(
     val uiState by viewModel.uiState.collectAsState()
     val systemUiController = rememberSystemUiController()
 
+    // 延迟加载数据
+    LaunchedEffect(Unit) {
+        viewModel.initialize()
+    }
+
     // 全屏状态
     var isFullscreen by remember { mutableStateOf(false) }
 

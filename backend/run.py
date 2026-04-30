@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FunHub Backend Application Entry Point"""
+"""fanhub Backend Application Entry Point"""
 
 import sys
 from pathlib import Path

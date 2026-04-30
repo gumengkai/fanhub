@@ -1,4 +1,4 @@
-# FunHub Docker 部署指南
+# fanhub Docker 部署指南
 
 🚀 **单容器部署方案** - 前后端一体化，简单快捷
 
@@ -17,7 +17,7 @@
 ### 一键部署
 
 ```bash
-cd /home/gmk/funhub
+cd /home/gmk/fanhub
 
 # 一键部署
 chmod +x deploy.sh
@@ -31,13 +31,13 @@ chmod +x deploy.sh
 
 ```bash
 # 检查容器状态
-docker ps | grep funhub
+docker ps | grep fanhub
 
 # 检查健康状态
 curl http://localhost:8080/api/health
 
 # 查看实时日志
-docker logs funhub -f
+docker logs fanhub -f
 ```
 
 ---
@@ -62,24 +62,24 @@ mkdir -p storage/database storage/thumbnails
 
 ```bash
 # 首次构建（约 5-10 分钟）
-docker build -t funhub:latest .
+docker build -t fanhub:latest .
 ```
 
 ### 步骤 4：启动容器
 
 ```bash
 docker run -d \
-    --name funhub \
+    --name fanhub \
     --restart unless-stopped \
     -p 8080:8080 \
     -v "$(pwd)/storage:/app/storage" \
     -v /media:/media:ro \
     -e FLASK_ENV=production \
-    -e SECRET_KEY=funhub-secret-key-change-in-production \
-    -e DATABASE_PATH=/app/storage/database/funhub.db \
+    -e SECRET_KEY=fanhub-secret-key-change-in-production \
+    -e DATABASE_PATH=/app/storage/database/fanhub.db \
     -e THUMBNAIL_FOLDER=/app/storage/thumbnails \
     -e CORS_ORIGINS=http://localhost,http://127.0.0.1 \
-    funhub:latest
+    fanhub:latest
 ```
 
 ### 步骤 5：初始化数据库
@@ -87,7 +87,7 @@ docker run -d \
 首次启动时会自动初始化数据库。如需手动初始化：
 
 ```bash
-docker exec -it funhub /app/venv/bin/python /app/backend/migrate.py
+docker exec -it fanhub /app/venv/bin/python /app/backend/migrate.py
 ```
 
 ---
@@ -98,26 +98,26 @@ docker exec -it funhub /app/venv/bin/python /app/backend/migrate.py
 
 ```bash
 # 启动
-docker start funhub
+docker start fanhub
 
 # 停止
-docker stop funhub
+docker stop fanhub
 
 # 重启
-docker restart funhub
+docker restart fanhub
 
 # 重新构建并启动
-docker build -t funhub:latest . && docker rm -f funhub && docker run -d --name funhub -p 8080:8080 -v "$(pwd)/storage:/app/storage" funhub:latest
+docker build -t fanhub:latest . && docker rm -f fanhub && docker run -d --name fanhub -p 8080:8080 -v "$(pwd)/storage:/app/storage" fanhub:latest
 ```
 
 ### 查看状态
 
 ```bash
 # 容器状态
-docker ps | grep funhub
+docker ps | grep fanhub
 
 # 资源使用
-docker stats funhub
+docker stats fanhub
 
 # 健康检查
 curl http://localhost:8080/api/health
@@ -127,23 +127,23 @@ curl http://localhost:8080/api/health
 
 ```bash
 # 实时日志
-docker logs funhub -f
+docker logs fanhub -f
 
 # 最近 100 行
-docker logs funhub --tail=100
+docker logs fanhub --tail=100
 
 # 仅后端日志
-docker exec funhub cat /var/log/supervisor/flask.out.log
+docker exec fanhub cat /var/log/supervisor/flask.out.log
 
 # 仅前端日志
-docker exec funhub cat /var/log/supervisor/nginx.out.log
+docker exec fanhub cat /var/log/supervisor/nginx.out.log
 ```
 
 ### 进入容器
 
 ```bash
 # 进入容器 shell
-docker exec -it funhub bash
+docker exec -it fanhub bash
 
 # 查看目录结构
 ls -la /app
@@ -161,7 +161,7 @@ supervisorctl status
 ```
 storage/
 ├── database/
-│   └── funhub.db      # SQLite 数据库
+│   └── fanhub.db      # SQLite 数据库
 └── thumbnails/         # 视频缩略图缓存
 ```
 
@@ -169,7 +169,7 @@ storage/
 
 ```bash
 # 备份数据库
-cp storage/database/funhub.db storage/database/funhub.db.backup
+cp storage/database/fanhub.db storage/database/fanhub.db.backup
 
 # 备份缩略图
 tar -czf thumbnails-backup.tar.gz storage/thumbnails/
@@ -179,13 +179,13 @@ tar -czf thumbnails-backup.tar.gz storage/thumbnails/
 
 ```bash
 # 停止容器
-docker stop funhub
+docker stop fanhub
 
 # 恢复数据库
-cp storage/database/funhub.db.backup storage/database/funhub.db
+cp storage/database/fanhub.db.backup storage/database/fanhub.db
 
 # 重启容器
-docker start funhub
+docker start fanhub
 ```
 
 ---
@@ -203,7 +203,7 @@ docker start funhub
 
 ```bash
 # 使用不同端口（例如 3000）
-docker run -d --name funhub -p 3000:8080 ...
+docker run -d --name fanhub -p 3000:8080 ...
 ```
 
 ### 域名访问
@@ -222,7 +222,7 @@ docker run -d --name funhub -p 3000:8080 ...
 
 ```bash
 # 查看详细错误
-docker logs funhub
+docker logs fanhub
 
 # 检查端口占用
 netstat -tlnp | grep 8080
@@ -235,7 +235,7 @@ journalctl -u docker
 
 ```bash
 # 检查容器是否运行
-docker ps | grep funhub
+docker ps | grep fanhub
 
 # 检查健康状态
 curl -v http://localhost:8080/api/health
@@ -249,23 +249,23 @@ sudo ufw allow 8080
 
 ```bash
 # 查看后端日志
-docker exec funhub cat /var/log/supervisor/flask.err.log
+docker exec fanhub cat /var/log/supervisor/flask.err.log
 
 # 重启后端服务
-docker exec funhub supervisorctl restart flask
+docker exec fanhub supervisorctl restart flask
 
 # 检查数据库
-docker exec funhub ls -la /app/storage/database/
+docker exec fanhub ls -la /app/storage/database/
 ```
 
 ### 前端页面空白
 
 ```bash
 # 查看前端日志
-docker exec funhub cat /var/log/supervisor/nginx.err.log
+docker exec fanhub cat /var/log/supervisor/nginx.err.log
 
 # 重建镜像
-docker build -t funhub:latest . --no-cache
+docker build -t fanhub:latest . --no-cache
 
 # 清除浏览器缓存后重试
 ```
@@ -274,13 +274,13 @@ docker build -t funhub:latest . --no-cache
 
 ```bash
 # 检查 ffmpeg
-docker exec funhub ffmpeg -version
+docker exec fanhub ffmpeg -version
 
 # 检查存储权限
-docker exec funhub ls -la /app/storage/
+docker exec fanhub ls -la /app/storage/
 
 # 修复权限
-docker exec funhub chmod -R 755 /app/storage/
+docker exec fanhub chmod -R 755 /app/storage/
 ```
 
 ---
@@ -301,14 +301,14 @@ docker exec funhub chmod -R 755 /app/storage/
 
 3. **使用 HTTPS**（需要反向代理）
    ```
-   浏览器 ← HTTPS → Nginx 反向代理 ← HTTP → FunHub 容器
+   浏览器 ← HTTPS → Nginx 反向代理 ← HTTP → fanhub 容器
    ```
 
 4. **定期更新**
    ```bash
-   docker build -t funhub:latest .
-   docker stop funhub && docker rm funhub
-   docker run -d --name funhub -p 8080:8080 ...
+   docker build -t fanhub:latest .
+   docker stop fanhub && docker rm fanhub
+   docker run -d --name fanhub -p 8080:8080 ...
    ```
 
 ---
@@ -320,7 +320,7 @@ docker exec funhub chmod -R 755 /app/storage/
 如果内存不足，限制容器内存：
 
 ```bash
-docker run -d --name funhub --memory="2g" --memory-reservation="1g" ...
+docker run -d --name fanhub --memory="2g" --memory-reservation="1g" ...
 ```
 
 ### 缩略图缓存
@@ -328,7 +328,7 @@ docker run -d --name funhub --memory="2g" --memory-reservation="1g" ...
 定期清理过期缩略图：
 
 ```bash
-docker exec funhub find /app/storage/thumbnails -mtime +7 -delete
+docker exec fanhub find /app/storage/thumbnails -mtime +7 -delete
 ```
 
 ---
@@ -338,8 +338,8 @@ docker exec funhub find /app/storage/thumbnails -mtime +7 -delete
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `FLASK_ENV` | `production` | Flask 运行环境 |
-| `SECRET_KEY` | `funhub-secret-key...` | Flask 密钥 |
-| `DATABASE_PATH` | `/app/storage/database/funhub.db` | 数据库路径 |
+| `SECRET_KEY` | `fanhub-secret-key...` | Flask 密钥 |
+| `DATABASE_PATH` | `/app/storage/database/fanhub.db` | 数据库路径 |
 | `THUMBNAIL_FOLDER` | `/app/storage/thumbnails` | 缩略图目录 |
 | `CORS_ORIGINS` | `http://localhost,...` | 允许的跨域来源 |
 
@@ -355,9 +355,9 @@ docker exec funhub find /app/storage/thumbnails -mtime +7 -delete
 cat DEPLOY.md
 
 # 查看容器信息
-docker inspect funhub
+docker inspect fanhub
 ```
 
 ---
 
-**部署完成后，访问 http://localhost:8080 开始使用 FunHub！** 🎉
+**部署完成后，访问 http://localhost:8080 开始使用 fanhub！** 🎉

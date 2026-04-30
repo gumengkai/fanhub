@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Space, Tag, Modal, Input, message, Select, Tooltip, Slider } from 'antd'
 import {
-  HeartOutlined, HeartFilled, DeleteOutlined, TagsOutlined,
+  HeartOutlined, HeartFilled, StarOutlined, StarFilled, DeleteOutlined, TagsOutlined,
   PlayCircleOutlined, PauseCircleOutlined, StepBackwardOutlined, StepForwardOutlined,
   OrderedListOutlined, FullscreenOutlined, FullscreenExitOutlined,
   LeftOutlined, SoundOutlined, MutedOutlined, HomeOutlined,
@@ -39,6 +39,7 @@ function ShortVideo() {
   const [showTags, setShowTags] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
   const [filterType, setFilterType] = useState(tagParam ? 'tag' : 'all')
+  const [unwatchedOnly, setUnwatchedOnly] = useState(false)
   const [selectedTag, setSelectedTag] = useState(tagParam ? parseInt(tagParam) : null)
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const [tags, setTags] = useState([])
@@ -120,10 +121,17 @@ function ShortVideo() {
 
   useEffect(() => {
     let filtered = allVideos
-    if (filterType === 'favorite') filtered = allVideos.filter(v => v.is_favorite)
+    if (filterType === 'liked') filtered = allVideos.filter(v => v.is_liked)
+    else if (filterType === 'favorite') filtered = allVideos.filter(v => v.is_favorite)
     else if (filterType === 'tag' && selectedTag) {
       filtered = allVideos.filter(v => v.tags && v.tags.some(t => t.id === selectedTag))
     }
+    
+    // 应用未观看筛选
+    if (unwatchedOnly) {
+      filtered = filtered.filter(v => !v.view_count || v.view_count === 0)
+    }
+    
     setPlaylist(filtered)
     // 如果当前视频在新筛选列表中，保持当前索引，否则重置为0
     const currentVideoId = playlist[currentIndex]?.id
@@ -133,7 +141,7 @@ function ShortVideo() {
     } else if (newIndex !== currentIndex) {
       setCurrentIndex(newIndex)
     }
-  }, [filterType, selectedTag, allVideos])
+  }, [filterType, selectedTag, allVideos, unwatchedOnly])
 
   useEffect(() => {
     const handleMouseMove = () => {
@@ -200,7 +208,8 @@ function ShortVideo() {
         case 'm': toggleMute(); break
         case 'r': setIsRandom(prev => !prev); break
         case 'l': if (currentVideo) openTagModal(); break
-        case 'c': if (currentVideo) toggleFavorite(); break
+        case 'c': if (currentVideo) toggleLike(); break
+        case 's': if (currentVideo) toggleFavorite(); break
         case 'Escape': if (isFullscreen) toggleFullscreen(); else navigate('/videos'); break
         default: break
       }
@@ -358,6 +367,16 @@ function ShortVideo() {
     }
   }
 
+  const toggleLike = async () => {
+    if (!currentVideo) return
+    try {
+      await videosApi.toggleLike(currentVideo.id)
+      currentVideo.is_liked = !currentVideo.is_liked
+      setPlaylist([...playlist])
+      message.success(currentVideo.is_liked ? '已添加到喜欢' : '已取消喜欢')
+    } catch (error) { message.error('操作失败') }
+  }
+
   const toggleFavorite = async () => {
     if (!currentVideo) return
     try {
@@ -500,9 +519,18 @@ function ShortVideo() {
         <div className="filter-controls">
           <Select value={filterType} onChange={setFilterType} style={{ width: 120 }} size={isMobileView ? 'small' : 'middle'}>
             <Option value="all">全部视频</Option>
+            <Option value="liked">喜欢</Option>
             <Option value="favorite">收藏</Option>
             <Option value="tag">标签筛选</Option>
           </Select>
+          <Button 
+            type={unwatchedOnly ? 'primary' : 'default'}
+            onClick={() => setUnwatchedOnly(!unwatchedOnly)}
+            size={isMobileView ? 'small' : 'middle'}
+            style={{ marginLeft: 8 }}
+          >
+            {unwatchedOnly ? '未观看 ✓' : '未观看'}
+          </Button>
           {filterType === 'tag' && (
             <Select
               value={selectedTag}
@@ -561,12 +589,23 @@ function ShortVideo() {
           <div className="action-group">
             <Button
               type="text"
-              icon={currentVideo?.is_favorite ? <HeartFilled /> : <HeartOutlined />}
+              icon={currentVideo?.is_liked ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined />}
+              onClick={toggleLike}
+              size="large"
+              className={`action-btn ${currentVideo?.is_liked ? 'liked' : ''}`}
+            />
+            <span className="action-btn-text">喜欢</span>
+          </div>
+
+          <div className="action-group">
+            <Button
+              type="text"
+              icon={currentVideo?.is_favorite ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
               onClick={toggleFavorite}
               size="large"
               className={`action-btn ${currentVideo?.is_favorite ? 'favorited' : ''}`}
             />
-            <span className="action-btn-text">喜欢</span>
+            <span className="action-btn-text">收藏</span>
           </div>
 
           <div className="action-group">

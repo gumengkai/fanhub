@@ -53,12 +53,20 @@ class VideoLibraryViewModel @Inject constructor(
     private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(LibraryUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(LibraryUiState(isLoading = false))
     val uiState = _uiState.asStateFlow()
 
-    init {
-        loadTags()
-        loadVideos(reset = true)
+    private var isInitialized = false
+
+    /**
+     * 延迟初始化，在界面准备好后再调用
+     */
+    fun initialize() {
+        if (!isInitialized) {
+            isInitialized = true
+            loadTags()
+            loadVideos(reset = true)
+        }
     }
 
     private fun loadTags() {

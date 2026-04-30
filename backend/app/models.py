@@ -1,4 +1,4 @@
-"""Database Models for FunHub"""
+"""Database Models for fanhub"""
 
 from datetime import datetime
 from app import db
@@ -17,7 +17,7 @@ class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     type = db.Column(db.String(16), nullable=False, default='local')  # 'local' or 'nas'
-    media_type = db.Column(db.String(16), nullable=False, default='all')  # 'all', 'video', 'image'
+    media_type = db.Column(db.String(16), nullable=False, default='all')  # 'all', 'video', 'image', 'douyin'
     path = db.Column(db.String(512), nullable=False)
     nas_config = db.Column(db.JSON, nullable=True)
     scan_interval = db.Column(db.Integer, default=60)
@@ -86,6 +86,7 @@ class Video(db.Model):
     height = db.Column(db.Integer, nullable=True)
     thumbnail_path = db.Column(db.String(512), nullable=True)
     is_favorite = db.Column(db.Boolean, default=False)
+    is_liked = db.Column(db.Boolean, default=False)
     description = db.Column(db.Text, nullable=True)
     view_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -106,6 +107,7 @@ class Video(db.Model):
             'height': self.height,
             'thumbnail_path': self.thumbnail_path,
             'is_favorite': self.is_favorite,
+            'is_liked': self.is_liked,
             'description': self.description,
             'view_count': self.view_count,
             'tags': [tag.to_dict() for tag in self.tags] if self.tags else [],
@@ -133,6 +135,7 @@ class Image(db.Model):
     height = db.Column(db.Integer, nullable=True)
     thumbnail_path = db.Column(db.String(512), nullable=True)
     is_favorite = db.Column(db.Boolean, default=False)
+    is_liked = db.Column(db.Boolean, default=False)
     view_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -147,6 +150,7 @@ class Image(db.Model):
             'height': self.height,
             'thumbnail_path': self.thumbnail_path,
             'is_favorite': self.is_favorite,
+            'is_liked': self.is_liked,
             'view_count': self.view_count,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

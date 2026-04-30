@@ -1,0 +1,352 @@
+/* Douyin Library - 抖音极简风格 */
+
+.douyin-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.douyin-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* 空状态 */
+.douyin-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.douyin-empty h2 {
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.douyin-btn {
+  background: #FE2C55;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* 双击喜欢动画 */
+.like-animation {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: like-burst 0.8s ease-out forwards;
+  z-index: 100;
+}
+
+@keyframes like-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+/* 顶部控制栏 */
+.douyin-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
+  transition: opacity 0.2s ease;
+}
+
+.douyin-top-bar.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.douyin-back-btn {
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.douyin-filter-group {
+  display: flex;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.douyin-filter-group.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.douyin-filter-select {
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.douyin-counter {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* 播放模式按钮 */
+.douyin-mode-btn {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.2s ease;
+  font-size: 12px;
+}
+
+.douyin-mode-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 右侧操作按钮 - 始终显示 */
+.douyin-right-btns {
+  position: absolute;
+  right: 16px;
+  bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.douyin-btn-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.douyin-action-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  transition: transform 0.15s ease;
+}
+
+.douyin-action-btn:active {
+  transform: scale(0.9);
+}
+
+.douyin-action-btn.delete {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.douyin-btn-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+/* 进度条 */
+.douyin-progress {
+  position: absolute;
+  bottom: 60px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: opacity 0.2s ease;
+}
+
+.douyin-progress.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.douyin-progress-bar {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.douyin-progress-filled {
+  height: 100%;
+  background: #fff;
+  border-radius: 2px;
+}
+
+.douyin-time {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 视频信息 */
+.douyin-video-info {
+  position: absolute;
+  bottom: 100px;
+  left: 16px;
+  right: 80px;
+  transition: opacity 0.2s ease;
+}
+
+.douyin-video-info.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.douyin-video-info h3 {
+  color: #fff;
+  font-size: 16px;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.douyin-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.douyin-tag {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+/* 中央播放按钮 */
+.douyin-center-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 64px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+/* 音量控制 */
+.douyin-volume {
+  position: absolute;
+  bottom: 16px;
+  right: 80px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.douyin-volume.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.douyin-volume button {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.douyin-volume input {
+  width: 60px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  appearance: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.douyin-volume input::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 6px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .douyin-right-btns {
+    bottom: 80px;
+    gap: 20px;
+  }
+
+  .douyin-action-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 26px;
+  }
+
+  .douyin-progress {
+    bottom: 40px;
+  }
+
+  .douyin-video-info {
+    bottom: 70px;
+    right: 70px;
+  }
+
+  .douyin-volume {
+    display: none;
+  }
+
+  .douyin-mode-btn {
+    top: 60px;
+  }
+}

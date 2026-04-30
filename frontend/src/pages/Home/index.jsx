@@ -7,9 +7,10 @@ import {
   EyeOutlined,
   FireOutlined,
   TagOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons'
 import { Link, useNavigate } from 'react-router-dom'
-import { videosApi, imagesApi, tagsApi } from '@services/api'
+import { videosApi, imagesApi, tagsApi, douyinApi } from '@services/api'
 import MediaCard from '@components/MediaCard'
 import './index.css'
 
@@ -25,12 +26,16 @@ function Home() {
     favoriteVideos: 0,
     totalImages: 0,
     favoriteImages: 0,
+    totalDouyin: 0,
+    likedDouyin: 0,
   })
 
   // 热门视频Top10
   const [hotVideos, setHotVideos] = useState([])
   // 收藏视频Top10
   const [favoriteVideos, setFavoriteVideos] = useState([])
+  // 抖音库热门视频
+  const [hotDouyin, setHotDouyin] = useState([])
   // 热门标签Top10
   const [hotTags, setHotTags] = useState([])
 
@@ -42,11 +47,12 @@ function Home() {
     setLoading(true)
     try {
       // 1. 获取统计数据
-      const [videosRes, imagesRes, favVideosRes, favImagesRes] = await Promise.all([
+      const [videosRes, imagesRes, favVideosRes, favImagesRes, douyinStatsRes] = await Promise.all([
         videosApi.getList({ per_page: 1 }),
         imagesApi.getList({ per_page: 1 }),
         videosApi.getList({ per_page: 1, favorite: true }),
         imagesApi.getList({ per_page: 1, favorite: true }),
+        douyinApi.getStats(),
       ])
 
       setStats({
@@ -54,6 +60,8 @@ function Home() {
         favoriteVideos: favVideosRes.total || 0,
         totalImages: imagesRes.total || 0,
         favoriteImages: favImagesRes.total || 0,
+        totalDouyin: douyinStatsRes.total || 0,
+        likedDouyin: douyinStatsRes.liked || 0,
       })
 
       // 2. 获取热门视频Top10（按播放次数排序）
@@ -73,7 +81,15 @@ function Home() {
       })
       setFavoriteVideos(favoriteVideosRes.items || [])
 
-      // 4. 获取热门标签Top10
+      // 4. 获取抖音库热门视频
+      const hotDouyinRes = await douyinApi.getList({
+        per_page: 6,
+        sort_by: 'view_count',
+        order: 'desc',
+      })
+      setHotDouyin(hotDouyinRes.items || [])
+
+      // 5. 获取热门标签Top10
       const tagsRes = await tagsApi.getList()
       const sortedTags = (tagsRes || [])
         .sort((a, b) => (b.video_count || 0) - (a.video_count || 0))
@@ -100,6 +116,18 @@ function Home() {
       link: '/videos?favorite=true',
     },
     {
+      title: '抖音库',
+      value: stats.totalDouyin,
+      icon: <PlayCircleOutlined style={{ color: '#eb2f96' }} />,
+      link: '/douyin',
+    },
+    {
+      title: '抖音喜欢',
+      value: stats.likedDouyin,
+      icon: <HeartOutlined style={{ color: '#FE2C55' }} />,
+      link: '/douyin',
+    },
+    {
       title: '总图片数',
       value: stats.totalImages,
       icon: <PictureOutlined style={{ color: '#52c41a' }} />,
@@ -108,13 +136,17 @@ function Home() {
     {
       title: '收藏图片',
       value: stats.favoriteImages,
-      icon: <HeartOutlined style={{ color: '#eb2f96' }} />,
+      icon: <HeartOutlined style={{ color: '#722ed1' }} />,
       link: '/images?favorite=true',
     },
   ]
 
   const handleVideoClick = (video) => {
     navigate(`/videos/${video.id}`)
+  }
+
+  const handleDouyinClick = () => {
+    navigate('/douyin')
   }
 
   const handleTagClick = (tagId) => {
@@ -126,7 +158,7 @@ function Home() {
       {/* 顶部统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {statCards.map((card, index) => (
-          <Col xs={24} sm={12} md={6} key={index}>
+          <Col xs={24} sm={12} md={8} lg={4} key={index}>
             <Link to={card.link}>
               <Card hoverable loading={loading} className="stat-card">
                 <Statistic
@@ -143,7 +175,7 @@ function Home() {
       {/* 主内容区域 */}
       <Row gutter={[16, 16]}>
         {/* 左侧：热门视频和收藏视频 */}
-        <Col xs={24} lg={18}>
+        <Col xs={24} lg={12}>
           {/* 热门视频Top10 */}
           <Card
             className="section-card"
@@ -160,7 +192,7 @@ function Home() {
             {hotVideos.length > 0 ? (
               <Row gutter={[16, 16]}>
                 {hotVideos.map((video, index) => (
-                  <Col xs={24} sm={12} md={8} lg={6} xl={4} key={video.id}>
+                  <Col xs={24} sm={12} md={8} lg={6} key={video.id}>
                     <div className="top-item">
                       <div className={`top-rank ${index < 3 ? 'top-three' : ''}`}>
                         {index + 1}
@@ -197,7 +229,7 @@ function Home() {
             {favoriteVideos.length > 0 ? (
               <Row gutter={[16, 16]}>
                 {favoriteVideos.map((video) => (
-                  <Col xs={24} sm={12} md={8} lg={6} xl={4} key={video.id}>
+                  <Col xs={24} sm={12} md={8} lg={6} key={video.id}>
                     <MediaCard
                       item={video}
                       type="video"
@@ -208,6 +240,45 @@ function Home() {
               </Row>
             ) : (
               <Text type="secondary">暂无收藏视频</Text>
+            )}
+          </Card>
+        </Col>
+
+        {/* 中间：抖音库 */}
+        <Col xs={24} lg={6}>
+          <Card
+            className="section-card"
+            title={
+              <Space>
+                <PlayCircleOutlined style={{ color: '#eb2f96' }} />
+                <span>抖音库热门</span>
+              </Space>
+            }
+            extra={<Link to="/douyin">进入抖音库</Link>}
+            loading={loading}
+          >
+            {hotDouyin.length > 0 ? (
+              <Row gutter={[8, 8]}>
+                {hotDouyin.map((video, index) => (
+                  <Col span={12} key={video.id}>
+                    <div className="douyin-item" onClick={handleDouyinClick}>
+                      <div className={`douyin-rank ${index < 3 ? 'top-three' : ''}`}>
+                        {index + 1}
+                      </div>
+                      <MediaCard
+                        item={video}
+                        type="video"
+                        onClick={handleDouyinClick}
+                      />
+                      <div className="douyin-like">
+                        {video.is_liked && <HeartOutlined style={{ color: '#FE2C55' }} />}
+                      </div>
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <Text type="secondary">暂无抖音视频</Text>
             )}
           </Card>
         </Col>

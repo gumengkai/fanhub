@@ -17,6 +17,7 @@ def get_images():
     order = request.args.get('order', 'desc')
     source_id = request.args.get('source_id', type=int)
     favorite = request.args.get('favorite')
+    liked = request.args.get('liked')
 
     query = Image.query
 
@@ -30,6 +31,10 @@ def get_images():
         # 处理 'true', '1', 1 等值为 True
         is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
         query = query.filter(Image.is_favorite == is_fav)
+
+    if liked is not None:
+        is_liked_val = str(liked).lower() in ('true', '1', 'yes', 'on')
+        query = query.filter(Image.is_liked == is_liked_val)
 
     # Sorting
     sort_column = getattr(Image, sort_by, Image.created_at)
@@ -159,6 +164,19 @@ def toggle_favorite(image_id):
     })
 
 
+@images_bp.route('/<int:image_id>/like', methods=['POST'])
+def toggle_like(image_id):
+    """Toggle like status."""
+    image = Image.query.get_or_404(image_id)
+    image.is_liked = not image.is_liked
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Like status updated',
+        'is_liked': image.is_liked
+    })
+
+
 @images_bp.route('/batch', methods=['DELETE'])
 def batch_delete_images():
     """Delete multiple images."""
@@ -215,6 +233,7 @@ def get_all_images():
     search = request.args.get('search', '')
     source_id = request.args.get('source_id', type=int)
     favorite = request.args.get('favorite')
+    liked = request.args.get('liked')
     limit = request.args.get('limit', 500, type=int)
 
     query = Image.query
@@ -229,6 +248,10 @@ def get_all_images():
         # 处理 'true', '1', 1 等值为 True
         is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
         query = query.filter(Image.is_favorite == is_fav)
+
+    if liked is not None:
+        is_liked_val = str(liked).lower() in ('true', '1', 'yes', 'on')
+        query = query.filter(Image.is_liked == is_liked_val)
 
     images = query.order_by(Image.created_at).limit(limit).all()
 

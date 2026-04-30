@@ -24,11 +24,19 @@ class HomeViewModel @Inject constructor(
     private val apiService: ApiService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(HomeUiState(isLoading = false))
     val uiState = _uiState.asStateFlow()
 
-    init {
-        loadData()
+    private var isInitialized = false
+
+    /**
+     * 延迟加载数据，在界面准备好后再调用
+     */
+    fun initialize() {
+        if (!isInitialized) {
+            isInitialized = true
+            loadData()
+        }
     }
 
     fun loadData() {

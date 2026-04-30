@@ -9,6 +9,7 @@ import ImageLibrary from '@pages/ImageLibrary'
 import SourceConfig from '@pages/SourceConfig'
 import Favorites from '@pages/Favorites'
 import ShortVideo from '@pages/ShortVideo'
+import DouyinLibrary from '@pages/DouyinLibrary'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/videos" element={<VideoLibrary />} />
           <Route path="/videos/:id" element={<VideoPlay />} />
           <Route path="/short-video" element={<ShortVideo />} />
+          <Route path="/douyin" element={<DouyinLibrary />} />
           <Route path="/images" element={<ImageLibrary />} />
           <Route path="/sources" element={<SourceConfig />} />
           <Route path="/favorites" element={<Favorites />} />

@@ -3,6 +3,8 @@ import { Card, Badge, Tooltip, Button, Space, Checkbox } from 'antd'
 import {
   HeartOutlined,
   HeartFilled,
+  StarOutlined,
+  StarFilled,
   PlayCircleOutlined,
   ClockCircleOutlined,
   VideoCameraOutlined,
@@ -15,6 +17,7 @@ function MediaCard({
   item,
   type,
   onFavorite,
+  onLike,
   onClick,
   onPreview,
   onDelete,
@@ -121,10 +124,20 @@ function MediaCard({
         </div>
       }
       actions={selectMode ? [] : [
+        <Tooltip title={item.is_liked ? '取消喜欢' : '喜欢'} key="like">
+          <Button
+            type="text"
+            icon={item.is_liked ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined />}
+            onClick={(e) => {
+              e.stopPropagation()
+              onLike?.(item)
+            }}
+          />
+        </Tooltip>,
         <Tooltip title={item.is_favorite ? '取消收藏' : '收藏'} key="favorite">
           <Button
             type="text"
-            icon={item.is_favorite ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined />}
+            icon={item.is_favorite ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
             onClick={(e) => {
               e.stopPropagation()
               onFavorite?.(item)

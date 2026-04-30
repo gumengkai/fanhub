@@ -1,5 +1,5 @@
 #!/bin/bash
-# FunHub 前端开发启动脚本
+# fanhub 前端开发启动脚本
 # 启动 Vite 前端开发服务器（热重载模式）
 
 set -e
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
 
-echo "🚀 FunHub 前端开发服务"
+echo "🚀 fanhub 前端开发服务"
 echo "======================"
 echo "📁 项目目录：$PROJECT_DIR"
 echo ""

@@ -76,6 +76,11 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // 延迟加载数据，等界面准备好后再请求
+    LaunchedEffect(Unit) {
+        viewModel.initialize()
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Background)
     ) {

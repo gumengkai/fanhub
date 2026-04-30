@@ -21,11 +21,24 @@ class TagBrowserViewModel @Inject constructor(
     private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(TagBrowserUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(TagBrowserUiState(isLoading = false))
     val uiState = _uiState.asStateFlow()
 
-    init {
+    private var isInitialized = false
+
+    /**
+     * 延迟初始化，在界面准备好后再加载数据
+     */
+    fun initialize() {
+        if (!isInitialized) {
+            isInitialized = true
+            loadTags()
+        }
+    }
+
+    private fun loadTags() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             mediaRepository.getTags()
                 .onSuccess { tags -> _uiState.update { it.copy(tags = tags, isLoading = false) } }
                 .onFailure { _uiState.update { it.copy(isLoading = false) } }

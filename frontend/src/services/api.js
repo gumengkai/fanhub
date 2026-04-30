@@ -27,6 +27,7 @@ export const videosApi = {
   update: (id, data) => api.put(`/videos/${id}`, data),
   delete: (id) => api.delete(`/videos/${id}`),
   toggleFavorite: (id) => api.post(`/videos/${id}/favorite`),
+  toggleLike: (id) => api.post(`/videos/${id}/like`),
   regenerateThumbnail: (id) => api.post(`/videos/${id}/thumbnail`),
   fixThumbnails: () => api.post('/videos/thumbnails/fix'),
   getStreamUrl: (id) => `/api/videos/${id}/stream`,
@@ -42,6 +43,7 @@ export const imagesApi = {
   delete: (id) => api.delete(`/images/${id}`),
   batchDelete: (imageIds) => api.delete('/images/batch', { data: { image_ids: imageIds } }),
   toggleFavorite: (id) => api.post(`/images/${id}/favorite`),
+  toggleLike: (id) => api.post(`/images/${id}/like`),
   getFileUrl: (id) => `/api/images/${id}/file`,
   getThumbnailUrl: (id) => `/api/images/${id}/thumbnail`,
   getAll: (params = {}) => api.get('/images/all', { params }),
@@ -62,6 +64,11 @@ export const favoritesApi = {
   getStats: () => api.get('/favorites/stats'),
 }
 
+export const likesApi = {
+  getList: (params = {}) => api.get('/likes', { params }),
+  getStats: () => api.get('/likes/stats'),
+}
+
 export const tagsApi = {
   getList: () => api.get('/tags'),
   create: (data) => api.post('/tags', data),
@@ -75,6 +82,18 @@ export const historyApi = {
   updateVideoHistory: (videoId, data) => api.post(`/history/video/${videoId}`, data),
   clearHistory: () => api.post('/history/clear'),
   getStats: () => api.get('/history/stats'),
+}
+
+export const douyinApi = {
+  getList: (params = {}) => api.get('/douyin', { params }),
+  getById: (id) => api.get(`/douyin/${id}`),
+  toggleLike: (id) => api.post(`/douyin/${id}/like`),
+  toggleFavorite: (id) => api.post(`/douyin/${id}/favorite`),
+  delete: (id) => api.delete(`/douyin/${id}`),
+  getStats: () => api.get('/douyin/stats'),
+  getStreamUrl: (id) => `/api/douyin/${id}/stream`,
+  getThumbnailUrl: (id) => `/api/douyin/${id}/thumbnail`,
+  updateHistory: (id, data) => api.post(`/douyin/${id}/history`, data),
 }
 
 export default api

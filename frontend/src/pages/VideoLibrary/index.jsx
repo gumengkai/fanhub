@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Typography,
   Space,
@@ -14,6 +14,8 @@ import {
   DeleteOutlined,
   HeartOutlined,
   HeartFilled,
+  StarOutlined,
+  StarFilled,
   PlayCircleOutlined,
   FilterOutlined,
   TagsOutlined,
@@ -29,19 +31,43 @@ const { Search } = Input
 function VideoLibrary() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(false)
   const [tags, setTags] = useState([])
+
+  // 从 URL 参数恢复状态
   const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 24,
+    current: parseInt(searchParams.get('page') || '1', 10),
+    pageSize: parseInt(searchParams.get('pageSize') || '24', 10),
     total: 0,
   })
-  const [sortBy, setSortBy] = useState('created_at')
-  const [sortOrder, setSortOrder] = useState('desc')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('all') // 'all' | 'favorite' | 'unwatched'
-  const [selectedTag, setSelectedTag] = useState(null)
+  const [sortBy, setSortBy] = useState(searchParams.get('sort')?.split('_')[0] || 'created_at')
+  const [sortOrder, setSortOrder] = useState(searchParams.get('sort')?.split('_')[1] || 'desc')
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
+  const [filterType, setFilterType] = useState(searchParams.get('filter') || 'all')
+  const [selectedTag, setSelectedTag] = useState(searchParams.get('tag') ? parseInt(searchParams.get('tag'), 10) : null)
+
+  // 更新 URL 参数的辅助函数
+  const updateUrlParams = useCallback((updates = {}) => {
+    const params = {}
+    const page = updates.page ?? pagination.current
+    const pageSize = updates.pageSize ?? pagination.pageSize
+    const sort = updates.sort ?? `${sortBy}_${sortOrder}`
+    const search = updates.search ?? searchQuery
+    const filter = updates.filter ?? filterType
+    const tag = updates.tag ?? selectedTag
+
+    // 只添加非默认值的参数
+    if (page > 1) params.page = page.toString()
+    if (pageSize !== 24) params.pageSize = pageSize.toString()
+    if (sort !== 'created_at_desc') params.sort = sort
+    if (search) params.search = search
+    if (filter !== 'all') params.filter = filter
+    if (tag) params.tag = tag.toString()
+
+    setSearchParams(params, { replace: true })
+  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, filterType, selectedTag, setSearchParams])
 
   // Fetch all tags for filter dropdown
   useEffect(() => {
@@ -67,7 +93,9 @@ function VideoLibrary() {
         order: sortOrder,
         search: searchQuery || searchParams.get('search') || '',
       }
-      if (filterType === 'favorite') {
+      if (filterType === 'liked') {
+        params.liked = true
+      } else if (filterType === 'favorite') {
         params.favorite = true
       } else if (filterType === 'unwatched') {
         params.unwatched = true
@@ -79,10 +107,10 @@ function VideoLibrary() {
       const response = await videosApi.getList(params)
 
       setVideos(response.items || [])
-      setPagination({
-        ...pagination,
+      setPagination(prev => ({
+        ...prev,
         total: response.total || 0,
-      })
+      }))
     } catch (error) {
       message.error('获取视频列表失败')
       console.error(error)
@@ -96,28 +124,26 @@ function VideoLibrary() {
   }, [fetchVideos])
 
   const handlePageChange = (page, pageSize) => {
-    setPagination({
-      ...pagination,
+    setPagination(prev => ({
+      ...prev,
       current: page,
       pageSize: pageSize,
-    })
+    }))
+    updateUrlParams({ page, pageSize })
   }
 
   const handleSortChange = (value) => {
     const [field, order] = value.split('_')
     setSortBy(field)
     setSortOrder(order)
-    setPagination({ ...pagination, current: 1 })
+    setPagination(prev => ({ ...prev, current: 1 }))
+    updateUrlParams({ sort: value, page: 1 })
   }
 
   const handleSearch = (value) => {
     setSearchQuery(value)
-    setPagination({ ...pagination, current: 1 })
-    if (value) {
-      setSearchParams({ search: value })
-    } else {
-      setSearchParams({})
-    }
+    setPagination(prev => ({ ...prev, current: 1 }))
+    updateUrlParams({ search: value, page: 1 })
   }
 
   const handleFavorite = async (video) => {
@@ -127,6 +153,19 @@ function VideoLibrary() {
       // 只更新当前视频的收藏状态，不刷新整个列表
       setVideos(videos.map(v =>
         v.id === video.id ? { ...v, is_favorite: !v.is_favorite } : v
+      ))
+    } catch (error) {
+      message.error('操作失败')
+    }
+  }
+
+  const handleLike = async (video) => {
+    try {
+      await videosApi.toggleLike(video.id)
+      message.success(video.is_liked ? '已取消喜欢' : '已添加到喜欢')
+      // 只更新当前视频的喜欢状态，不刷新整个列表
+      setVideos(videos.map(v =>
+        v.id === video.id ? { ...v, is_liked: !v.is_liked } : v
       ))
     } catch (error) {
       message.error('操作失败')
@@ -144,17 +183,9 @@ function VideoLibrary() {
   }
 
   const handlePlay = (video) => {
-    // 传递当前列表的筛选条件到播放页面，用于上一个/下一个导航
-    const listContext = {
-      sortBy,
-      sortOrder,
-      searchQuery,
-      filterType,
-      selectedTag,
-      page: pagination.current,
-      pageSize: pagination.pageSize,
-    }
-    navigate(`/videos/${video.id}`, { state: { listContext } })
+    // 保存当前路径（包含所有 URL 参数）用于返回
+    const returnPath = location.pathname + location.search
+    navigate(`/videos/${video.id}`, { state: { returnPath } })
   }
 
   const handlePlayByTag = () => {
@@ -167,7 +198,8 @@ function VideoLibrary() {
 
   const handleTagChange = (value) => {
     setSelectedTag(value)
-    setPagination({ ...pagination, current: 1 })
+    setPagination(prev => ({ ...prev, current: 1 }))
+    updateUrlParams({ tag: value, page: 1 })
   }
 
   const sortOptions = [
@@ -221,14 +253,18 @@ function VideoLibrary() {
             value={filterType}
             onChange={(value) => {
               setFilterType(value)
-              setPagination({ ...pagination, current: 1 })
+              setPagination(prev => ({ ...prev, current: 1 }))
+              updateUrlParams({ filter: value, page: 1 })
             }}
             style={{ width: 130 }}
             placeholder={<><FilterOutlined /> 筛选</>}
           >
             <Option value="all">全部视频</Option>
+            <Option value="liked">
+              <HeartFilled style={{ color: '#ff4d4f', marginRight: 4 }} />已喜欢
+            </Option>
             <Option value="favorite">
-              <HeartFilled style={{ color: '#fb7299', marginRight: 4 }} />已收藏
+              <StarFilled style={{ color: '#faad14', marginRight: 4 }} />已收藏
             </Option>
             <Option value="unwatched">
               <EyeInvisibleOutlined style={{ marginRight: 4 }} />未观看
@@ -256,6 +292,7 @@ function VideoLibrary() {
           onChange: handlePageChange,
         }}
         onFavorite={handleFavorite}
+        onLike={handleLike}
         onItemClick={handlePlay}
         onDelete={handleDelete}
       />

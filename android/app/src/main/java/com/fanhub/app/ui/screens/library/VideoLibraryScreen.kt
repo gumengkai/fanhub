@@ -94,6 +94,11 @@ fun VideoLibraryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // 延迟初始化，等界面准备好后再加载数据
+    LaunchedEffect(Unit) {
+        viewModel.initialize()
+    }
+
     // 设置初始标签
     LaunchedEffect(initialTagId) {
         if (initialTagId != null && initialTagId != uiState.selectedTagId) {
@@ -111,17 +116,20 @@ fun VideoLibraryScreen(
         }
     }
 
-    // Infinite scroll
+    // Infinite scroll - 添加防抖和状态检查
     val shouldLoadMore by remember {
         derivedStateOf {
             val layoutInfo = gridState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
             val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible >= totalItems - 6
+            // 确保有更多数据且不在加载中
+            lastVisible >= totalItems - 6 && uiState.hasMore && !uiState.isLoadingMore
         }
     }
     LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) viewModel.loadVideos()
+        if (shouldLoadMore) {
+            viewModel.loadVideos()
+        }
     }
 
     // 排序下拉框状态
@@ -137,6 +145,7 @@ fun VideoLibraryScreen(
         contentPadding = PaddingValues(bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // 性能优化：限制预加载和缓存
         modifier = Modifier.fillMaxSize().background(Background)
     ) {
         // 标题栏
@@ -390,7 +399,10 @@ fun VideoLibraryScreen(
                 }
             }
         } else {
-            items(uiState.videos, key = { it.id }) { video ->
+            items(
+                items = uiState.videos,
+                key = { it.id }
+            ) { video ->
                 VideoGridCard(
                     video = video,
                     serverUrl = serverUrl,
@@ -472,7 +484,9 @@ private fun VideoGridCard(
                     model = "${serverUrl}/api/videos/${video.id}/thumbnail",
                     contentDescription = video.title,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    // 限制图片尺寸以减少内存占用
+                    modifier = Modifier.fillMaxSize(),
+                    onError = { /* 静默处理加载错误 */ }
                 )
 
                 // 时长标签

@@ -114,6 +114,43 @@
   flex-shrink: 0;
 }
 
+/* 抖音库样式 */
+.douyin-item {
+  position: relative;
+  cursor: pointer;
+}
+
+.douyin-rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  z-index: 10;
+}
+
+.douyin-rank.top-three {
+  background: linear-gradient(135deg, #FE2C55, #ff6b81);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(254, 44, 85, 0.4);
+}
+
+.douyin-like {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  font-size: 12px;
+  z-index: 10;
+}
+
 /* 响应式调整 */
 @media (max-width: 768px) {
   .section-card {

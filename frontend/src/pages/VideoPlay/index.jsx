@@ -21,6 +21,8 @@ import {
 import {
   HeartOutlined,
   HeartFilled,
+  StarOutlined,
+  StarFilled,
   LeftOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -58,6 +60,7 @@ function VideoPlay() {
   const [listContext, setListContext] = useState(null)
   const [adjacentVideos, setAdjacentVideos] = useState({ prev: null, next: null })
   const [navLoading, setNavLoading] = useState(false)
+  const [returnUrl, setReturnUrl] = useState('/videos')
 
   const fetchVideo = useCallback(async () => {
     setLoading(true)
@@ -126,10 +129,22 @@ function VideoPlay() {
     }
   }, [listContext, id])
 
-  // 从 location state 获取列表上下文
+  // 从 location state 获取列表上下文和返回路径
   useEffect(() => {
     if (location.state?.listContext) {
       setListContext(location.state.listContext)
+    } else {
+      // 如果没有 listContext，使用默认参数
+      setListContext({
+        sortBy: 'created_at',
+        sortOrder: 'desc',
+        searchQuery: '',
+        favoriteOnly: false,
+        selectedTag: null
+      })
+    }
+    if (location.state?.returnPath) {
+      setReturnUrl(location.state.returnPath)
     }
   }, [location.state])
 
@@ -146,9 +161,9 @@ function VideoPlay() {
   // 导航到上一个/下一个视频
   const handleNavigate = (direction) => {
     const targetVideo = direction === 'prev' ? adjacentVideos.prev : adjacentVideos.next
-    if (targetVideo && listContext) {
+    if (targetVideo) {
       navigate(`/videos/${targetVideo.id}`, {
-        state: { listContext }
+        state: { returnPath: returnUrl, listContext }
       })
     }
   }
@@ -193,6 +208,16 @@ function VideoPlay() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [adjacentVideos, listContext])
 
+  const handleLike = async () => {
+    try {
+      const response = await videosApi.toggleLike(video.id)
+      setVideo({ ...video, is_liked: response.is_liked })
+      message.success(response.is_liked ? '已添加到喜欢' : '已取消喜欢')
+    } catch (error) {
+      message.error('操作失败')
+    }
+  }
+
   const handleFavorite = async () => {
     try {
       const response = await videosApi.toggleFavorite(video.id)
@@ -207,7 +232,7 @@ function VideoPlay() {
     try {
       await videosApi.delete(video.id)
       message.success('视频已删除')
-      navigate('/videos')
+      navigate(returnUrl)
     } catch (error) {
       message.error('删除失败')
     }
@@ -289,7 +314,7 @@ function VideoPlay() {
     return (
       <Empty
         description="视频不存在"
-        extra={<Button onClick={() => navigate('/videos')}>返回视频库</Button>}
+        extra={<Button onClick={() => navigate(returnUrl)}>返回视频库</Button>}
       />
     )
   }
@@ -299,7 +324,7 @@ function VideoPlay() {
       <div className="video-nav-header">
         <Button
           icon={<LeftOutlined />}
-          onClick={() => navigate('/videos')}
+          onClick={() => navigate(returnUrl)}
           className="back-button"
         >
           返回视频库
@@ -388,10 +413,18 @@ function VideoPlay() {
                   </Title>
                   <Space>
                     <Button
+                      type={video.is_liked ? 'primary' : 'default'}
+                      icon={video.is_liked ? <HeartFilled /> : <HeartOutlined />}
+                      onClick={handleLike}
+                      style={{ borderColor: video.is_liked ? '#ff4d4f' : undefined, background: video.is_liked ? '#ff4d4f' : undefined }}
+                    >
+                      {video.is_liked ? '已喜欢' : '喜欢'}
+                    </Button>
+                    <Button
                       type={video.is_favorite ? 'primary' : 'default'}
-                      icon={video.is_favorite ? <HeartFilled /> : <HeartOutlined />}
+                      icon={video.is_favorite ? <StarFilled /> : <StarOutlined />}
                       onClick={handleFavorite}
-                      style={{ borderColor: video.is_favorite ? '#fb7299' : undefined, background: video.is_favorite ? '#fb7299' : undefined }}
+                      style={{ borderColor: video.is_favorite ? '#faad14' : undefined, background: video.is_favorite ? '#faad14' : undefined }}
                     >
                       {video.is_favorite ? '已收藏' : '收藏'}
                     </Button>

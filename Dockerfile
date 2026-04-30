@@ -1,4 +1,4 @@
-# FunHub Single-Container Dockerfile
+# fanhub Single-Container Dockerfile
 # Combines frontend (React + Nginx) and backend (Flask) in one container
 
 # ============ STAGE 1: BUILD FRONTEND ============
@@ -19,17 +19,12 @@ COPY frontend/ ./
 RUN npm run build
 
 # ============ STAGE 2: FINAL IMAGE ============
-FROM jrottenberg/ffmpeg:latest
+FROM python:3.12-slim
 
-# Override the ffmpeg ENTRYPOINT
-ENTRYPOINT []
-
-# Install system dependencies
-RUN apt-get update --fix-missing || true && \
+# Install system dependencies including ffmpeg
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    python3-venv \
+    ffmpeg \
     libsm6 \
     libxext6 \
     libglib2.0-0 \
@@ -74,9 +69,9 @@ ENV FLASK_APP=run.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 ENV PATH=/app/venv/bin:/usr/local/bin:$PATH
-ENV DATABASE_PATH=/app/storage/database/funhub.db
+ENV DATABASE_PATH=/app/storage/database/fanhub.db
 ENV THUMBNAIL_FOLDER=/app/storage/thumbnails
-ENV CORS_ORIGINS=http://localhost,http://127.0.0.1,http://your-domain.com
+ENV CORS_ORIGINS=http://localhost,http://127.0.0.1,http://192.168.31.133:8080,http://192.168.31.133:5000
 
 # ============ EXPOSE PORTS ============
 # 8080 - Nginx (Frontend + API Proxy)

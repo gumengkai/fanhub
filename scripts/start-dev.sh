@@ -1,5 +1,5 @@
 #!/bin/bash
-# FunHub 开发模式启动脚本
+# fanhub 开发模式启动脚本
 # 同时启动前端和后端开发服务
 
 set -e
@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "🚀 FunHub 开发环境启动"
+echo "🚀 fanhub 开发环境启动"
 echo "======================"
 echo "📁 项目目录：$PROJECT_DIR"
 echo ""
@@ -54,7 +54,7 @@ cd "$PROJECT_DIR/backend"
 export FLASK_APP=run.py
 export FLASK_ENV=development
 export PYTHONUNBUFFERED=1
-export DATABASE_PATH="$PROJECT_DIR/storage/database/funhub.db"
+export DATABASE_PATH="$PROJECT_DIR/storage/database/fanhub.db"
 export THUMBNAIL_FOLDER="$PROJECT_DIR/storage/thumbnails"
 export CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080"
 export SECRET_KEY="dev-secret-key-for-local-development"

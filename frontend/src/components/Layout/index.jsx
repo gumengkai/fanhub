@@ -11,6 +11,7 @@ import {
   MenuOutlined,
   CloseOutlined,
   UserOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './index.css'
@@ -21,17 +22,19 @@ const { Search } = Input
 const navItems = [
   { key: '/', icon: <HomeOutlined />, label: '首页', path: '/' },
   { key: '/videos', icon: <VideoCameraOutlined />, label: '视频库', path: '/videos' },
+  { key: '/douyin', icon: <AppstoreOutlined />, label: '抖音库', path: '/douyin' },
   { key: '/short-video', icon: <PlayCircleOutlined />, label: '短视频', path: '/short-video' },
   { key: '/images', icon: <PictureOutlined />, label: '图片库', path: '/images' },
-  { key: '/favorites', icon: <HeartOutlined />, label: '收藏', path: '/favorites' },
+  { key: '/favorites', icon: <UserOutlined />, label: '个人中心', path: '/favorites' },
 ]
 
 const mobileNavItems = [
   { key: '/', icon: <HomeOutlined />, label: '首页', path: '/' },
   { key: '/videos', icon: <VideoCameraOutlined />, label: '视频', path: '/videos' },
+  { key: '/douyin', icon: <AppstoreOutlined />, label: '抖音', path: '/douyin' },
   { key: '/short-video', icon: <PlayCircleOutlined />, label: '短视频', path: '/short-video' },
   { key: '/images', icon: <PictureOutlined />, label: '图片', path: '/images' },
-  { key: '/favorites', icon: <HeartOutlined />, label: '收藏', path: '/favorites' },
+  { key: '/favorites', icon: <UserOutlined />, label: '中心', path: '/favorites' },
 ]
 
 function AppLayout({ children }) {
@@ -75,7 +78,7 @@ function AppLayout({ children }) {
         {/* Logo */}
         <div className="header-logo">
           <VideoCameraOutlined className="logo-icon" />
-          <span className="logo-text">FunHub</span>
+          <span className="logo-text">fanhub</span>
         </div>
 
         {/* Top Navigation Tabs */}
@@ -160,7 +163,7 @@ function AppLayout({ children }) {
         <div className="mobile-drawer-header">
           <Space>
             <VideoCameraOutlined className="drawer-icon" />
-            <span className="drawer-title">FunHub</span>
+            <span className="drawer-title">fanhub</span>
           </Space>
           <CloseOutlined
             className="drawer-close"

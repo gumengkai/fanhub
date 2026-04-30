@@ -9,6 +9,7 @@ function MediaGrid({
   loading = false,
   pagination,
   onFavorite,
+  onLike,
   onItemClick,
   onDelete,
   onPreview,
@@ -57,6 +58,7 @@ function MediaGrid({
                 item={item}
                 type={type}
                 onFavorite={onFavorite}
+                onLike={onLike}
                 onClick={() => onItemClick?.(item)}
                 onPreview={() => onPreview?.(item)}
                 onDelete={onDelete}

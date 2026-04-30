@@ -37,10 +37,18 @@ class FeedViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState = _uiState.asStateFlow()
 
-    init {
-        loadAllVideos()
-        loadTags()
-        loadWatchedVideos()
+    private var isInitialized = false
+
+    /**
+     * 延迟初始化，在界面准备好后再加载数据
+     */
+    fun initialize() {
+        if (!isInitialized) {
+            isInitialized = true
+            loadAllVideos()
+            loadTags()
+            loadWatchedVideos()
+        }
     }
 
     /** 获取所有视频（参考web端，先获取第一页知道总数，再获取全部） */

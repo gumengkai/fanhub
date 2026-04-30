@@ -33,6 +33,7 @@ import {
   VideoCameraOutlined,
   PictureOutlined,
   AppstoreOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons'
 import { sourcesApi } from '@services/api'
 
@@ -147,6 +148,8 @@ function SourceConfig() {
         return { text: '视频', icon: <VideoCameraOutlined />, color: 'blue' }
       case 'image':
         return { text: '图片', icon: <PictureOutlined />, color: 'green' }
+      case 'douyin':
+        return { text: '抖音库', icon: <PlayCircleOutlined />, color: 'magenta' }
       default:
         return { text: '全部', icon: <AppstoreOutlined />, color: 'default' }
     }
@@ -308,7 +311,7 @@ function SourceConfig() {
 
       <Card style={{ marginBottom: 24 }}>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={6}>
             <Statistic
               title="视频源"
               value={sources.filter(s => s.media_type === 'video').length}
@@ -316,7 +319,7 @@ function SourceConfig() {
               valueStyle={{ color: '#1890ff' }}
             />
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Statistic
               title="图片源"
               value={sources.filter(s => s.media_type === 'image').length}
@@ -324,7 +327,15 @@ function SourceConfig() {
               valueStyle={{ color: '#52c41a' }}
             />
           </Col>
-          <Col span={8}>
+          <Col span={6}>
+            <Statistic
+              title="抖音库"
+              value={sources.filter(s => s.media_type === 'douyin').length}
+              prefix={<PlayCircleOutlined />}
+              valueStyle={{ color: '#eb2f96' }}
+            />
+          </Col>
+          <Col span={6}>
             <Statistic
               title="混合源"
               value={sources.filter(s => s.media_type === 'all').length}
@@ -387,6 +398,7 @@ function SourceConfig() {
                   <Option value="all"><AppstoreOutlined /> 全部 (视频 + 图片)</Option>
                   <Option value="video"><VideoCameraOutlined /> 仅视频</Option>
                   <Option value="image"><PictureOutlined /> 仅图片</Option>
+                  <Option value="douyin"><PlayCircleOutlined /> 抖音库</Option>
                 </Select>
               </Form.Item>
             </Col>

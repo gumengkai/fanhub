@@ -4,16 +4,19 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.resolve()
 PROJECT_DIR = BASE_DIR.parent
 
+# 本地开发环境使用相对路径，Docker 环境使用环境变量
+STORAGE_DIR = Path(os.environ.get('STORAGE_DIR', str(PROJECT_DIR / 'storage')))
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
     # Database configuration - support Docker volume mounts
-    DATABASE_PATH = os.environ.get('DATABASE_PATH', '/app/storage/database/funhub.db')
+    DATABASE_PATH = os.environ.get('DATABASE_PATH', str(STORAGE_DIR / 'database' / 'fanhub.db'))
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{DATABASE_PATH}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Thumbnail folder - support Docker volume mounts
-    THUMBNAIL_FOLDER = Path(os.environ.get('THUMBNAIL_FOLDER', '/app/storage/thumbnails'))
+    THUMBNAIL_FOLDER = Path(os.environ.get('THUMBNAIL_FOLDER', str(STORAGE_DIR / 'thumbnails')))
     THUMBNAIL_FOLDER.mkdir(parents=True, exist_ok=True)
 
     VIDEO_EXTENSIONS = {'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'}
@@ -22,6 +25,7 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
     # CORS configuration - support both development and production
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1').split(',')
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1,http://192.168.31.133:5000,http://192.168.31.133:8080').split(',')
 
     SCAN_CHUNK_SIZE = 100

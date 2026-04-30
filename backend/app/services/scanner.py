@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from ..models import db, Video, Image, Source, WatchHistory
+from ..models import db, Video, Image, Source, WatchHistory, ThumbnailCache
 
 # Supported file extensions (browser-compatible formats only)
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.m4v', '.webm', '.ogv', '.ogg'}
@@ -21,7 +21,8 @@ def scan_source(source):
 
     if source.type == 'local':
         # Scan based on media_type
-        if source.media_type in ('all', 'video'):
+        # 'douyin' is treated as video-only
+        if source.media_type in ('all', 'video', 'douyin'):
             scan_local_directory(source, stats, 'video')
         if source.media_type in ('all', 'image'):
             scan_local_directory(source, stats, 'image')
@@ -65,25 +66,55 @@ def scan_local_directory(source, stats, media_type='all'):
 
     # Remove database records for files that no longer exist on disk
     if media_type in ('all', 'video'):
+        removed_videos = []
         for path, video in existing_videos.items():
             if path not in scanned_paths:
-                try:
-                    # Delete associated watch history first
-                    WatchHistory.query.filter_by(video_id=video.id).delete()
-                    # Delete the video record
-                    db.session.delete(video)
-                    stats['videos_removed'] = stats.get('videos_removed', 0) + 1
-                except Exception as e:
-                    stats['errors'].append(f"Error removing video record for {path}: {str(e)}")
+                removed_videos.append(video)
+
+        for video in removed_videos:
+            try:
+                # Delete thumbnail file from disk
+                if video.thumbnail_path and os.path.exists(video.thumbnail_path):
+                    try:
+                        os.remove(video.thumbnail_path)
+                    except OSError as e:
+                        stats['errors'].append(f"Error deleting thumbnail file {video.thumbnail_path}: {str(e)}")
+
+                # Delete ThumbnailCache record
+                ThumbnailCache.query.filter_by(media_type='video', media_id=video.id).delete()
+
+                # Delete associated watch history (cascade should handle this, but be explicit)
+                WatchHistory.query.filter_by(video_id=video.id).delete()
+
+                # Delete the video record (tags association will be auto-cleaned)
+                db.session.delete(video)
+                stats['videos_removed'] = stats.get('videos_removed', 0) + 1
+            except Exception as e:
+                stats['errors'].append(f"Error removing video record for {video.path}: {str(e)}")
 
     if media_type in ('all', 'image'):
+        removed_images = []
         for path, image in existing_images.items():
             if path not in scanned_paths:
-                try:
-                    db.session.delete(image)
-                    stats['images_removed'] = stats.get('images_removed', 0) + 1
-                except Exception as e:
-                    stats['errors'].append(f"Error removing image record for {path}: {str(e)}")
+                removed_images.append(image)
+
+        for image in removed_images:
+            try:
+                # Delete thumbnail file from disk
+                if image.thumbnail_path and os.path.exists(image.thumbnail_path):
+                    try:
+                        os.remove(image.thumbnail_path)
+                    except OSError as e:
+                        stats['errors'].append(f"Error deleting thumbnail file {image.thumbnail_path}: {str(e)}")
+
+                # Delete ThumbnailCache record
+                ThumbnailCache.query.filter_by(media_type='image', media_id=image.id).delete()
+
+                # Delete the image record
+                db.session.delete(image)
+                stats['images_removed'] = stats.get('images_removed', 0) + 1
+            except Exception as e:
+                stats['errors'].append(f"Error removing image record for {image.path}: {str(e)}")
 
     db.session.commit()
 

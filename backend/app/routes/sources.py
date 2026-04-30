@@ -35,8 +35,8 @@ def create_source():
 
     # Validate media_type
     media_type = data.get('media_type', 'all')
-    if media_type not in ['all', 'video', 'image']:
-        return jsonify({'error': 'Invalid media_type. Must be "all", "video", or "image"'}), 400
+    if media_type not in ['all', 'video', 'image', 'douyin']:
+        return jsonify({'error': 'Invalid media_type. Must be "all", "video", "image", or "douyin"'}), 400
 
     # Validate path for local sources
     if data['type'] == 'local' and not os.path.exists(data['path']):
@@ -67,7 +67,7 @@ def update_source(source_id):
     if 'name' in data:
         source.name = data['name']
     if 'media_type' in data:
-        if data['media_type'] not in ['all', 'video', 'image']:
+        if data['media_type'] not in ['all', 'video', 'image', 'douyin']:
             return jsonify({'error': 'Invalid media_type'}), 400
         source.media_type = data['media_type']
     if 'path' in data:

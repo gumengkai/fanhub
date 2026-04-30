@@ -16,6 +16,8 @@ import {
   DeleteOutlined,
   EyeOutlined,
   PlayCircleOutlined,
+  HeartFilled,
+  StarFilled,
   FilterOutlined,
   CheckSquareOutlined,
   CloseOutlined,
@@ -34,22 +36,43 @@ function ImageLibrary() {
   const [images, setImages] = useState([])
   const [allImages, setAllImages] = useState([])
   const [loading, setLoading] = useState(false)
+
+  // 从 URL 参数恢复状态
   const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 24,
+    current: parseInt(searchParams.get('page') || '1', 10),
+    pageSize: parseInt(searchParams.get('pageSize') || '24', 10),
     total: 0,
   })
-  const [sortBy, setSortBy] = useState('created_at')
-  const [sortOrder, setSortOrder] = useState('desc')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState(searchParams.get('sort')?.split('_')[0] || 'created_at')
+  const [sortOrder, setSortOrder] = useState(searchParams.get('sort')?.split('_')[1] || 'desc')
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [previewImage, setPreviewImage] = useState(null)
   const [previewVisible, setPreviewVisible] = useState(false)
   const [slideshowVisible, setSlideshowVisible] = useState(false)
   const [slideshowImages, setSlideshowImages] = useState([])
   const [slideshowStartIndex, setSlideshowStartIndex] = useState(0)
-  const [favoriteOnly, setFavoriteOnly] = useState(false)
+  const [filterType, setFilterType] = useState(searchParams.get('filter') || 'all')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
+
+  // 更新 URL 参数的辅助函数
+  const updateUrlParams = useCallback((updates = {}) => {
+    const params = {}
+    const page = updates.page ?? pagination.current
+    const pageSize = updates.pageSize ?? pagination.pageSize
+    const sort = updates.sort ?? `${sortBy}_${sortOrder}`
+    const search = updates.search ?? searchQuery
+    const filter = updates.filter ?? filterType
+
+    // 只添加非默认值的参数
+    if (page > 1) params.page = page.toString()
+    if (pageSize !== 24) params.pageSize = pageSize.toString()
+    if (sort !== 'created_at_desc') params.sort = sort
+    if (search) params.search = search
+    if (filter !== 'all') params.filter = filter
+
+    setSearchParams(params, { replace: true })
+  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, filterType, setSearchParams])
 
   const fetchImages = useCallback(async () => {
     setLoading(true)
@@ -61,29 +84,33 @@ function ImageLibrary() {
         order: sortOrder,
         search: searchQuery || searchParams.get('search') || '',
       }
-      if (favoriteOnly) {
+      if (filterType === 'liked') {
+        params.liked = true
+      } else if (filterType === 'favorite') {
         params.favorite = true
       }
 
       const response = await imagesApi.getList(params)
 
       setImages(response.items || [])
-      setPagination({
-        ...pagination,
+      setPagination(prev => ({
+        ...prev,
         total: response.total || 0,
-      })
+      }))
     } catch (error) {
       message.error('获取图片列表失败')
       console.error(error)
     } finally {
       setLoading(false)
     }
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, favoriteOnly])
+  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, filterType])
 
   const fetchAllImages = useCallback(async () => {
     try {
       const params = {}
-      if (favoriteOnly) {
+      if (filterType === 'liked') {
+        params.liked = true
+      } else if (filterType === 'favorite') {
         params.favorite = true
       }
       const response = await imagesApi.getAll(params)
@@ -91,7 +118,7 @@ function ImageLibrary() {
     } catch (error) {
       console.error('Failed to fetch all images:', error)
     }
-  }, [favoriteOnly])
+  }, [filterType])
 
   useEffect(() => {
     fetchImages()
@@ -111,28 +138,26 @@ function ImageLibrary() {
   }, [selectMode])
 
   const handlePageChange = (page, pageSize) => {
-    setPagination({
-      ...pagination,
+    setPagination(prev => ({
+      ...prev,
       current: page,
       pageSize: pageSize,
-    })
+    }))
+    updateUrlParams({ page, pageSize })
   }
 
   const handleSortChange = (value) => {
     const [field, order] = value.split('_')
     setSortBy(field)
     setSortOrder(order)
-    setPagination({ ...pagination, current: 1 })
+    setPagination(prev => ({ ...prev, current: 1 }))
+    updateUrlParams({ sort: value, page: 1 })
   }
 
   const handleSearch = (value) => {
     setSearchQuery(value)
-    setPagination({ ...pagination, current: 1 })
-    if (value) {
-      setSearchParams({ search: value })
-    } else {
-      setSearchParams({})
-    }
+    setPagination(prev => ({ ...prev, current: 1 }))
+    updateUrlParams({ search: value, page: 1 })
   }
 
   const handleFavorite = async (image) => {
@@ -147,6 +172,25 @@ function ImageLibrary() {
       // 同步更新 allImages
       setAllImages(prev => prev.length > 0
         ? prev.map(img => img.id === image.id ? { ...img, is_favorite: !img.is_favorite } : img)
+        : []
+      )
+    } catch (error) {
+      message.error('操作失败')
+    }
+  }
+
+  const handleLike = async (image) => {
+    try {
+      await imagesApi.toggleLike(image.id)
+      message.success(image.is_liked ? '已取消喜欢' : '已添加到喜欢')
+      // 只更新当前图片的喜欢状态，不刷新整个列表
+      const newImages = images.map(img =>
+        img.id === image.id ? { ...img, is_liked: !img.is_liked } : img
+      )
+      setImages(newImages)
+      // 同步更新 allImages
+      setAllImages(prev => prev.length > 0
+        ? prev.map(img => img.id === image.id ? { ...img, is_liked: !img.is_liked } : img)
         : []
       )
     } catch (error) {
@@ -270,16 +314,24 @@ function ImageLibrary() {
             ))}
           </Select>
 
-          <Space>
-            <FilterOutlined />
-            <Switch
-              checked={favoriteOnly}
-              onChange={setFavoriteOnly}
-              checkedChildren="收藏"
-              unCheckedChildren="全部"
-              size="small"
-            />
-          </Space>
+          <Select
+            value={filterType}
+            onChange={(value) => {
+              setFilterType(value)
+              setPagination(prev => ({ ...prev, current: 1 }))
+              updateUrlParams({ filter: value, page: 1 })
+            }}
+            style={{ width: 120 }}
+            placeholder={<><FilterOutlined /> 筛选</>}
+          >
+            <Option value="all">全部图片</Option>
+            <Option value="liked">
+              <HeartFilled style={{ color: '#ff4d4f', marginRight: 4 }} />已喜欢
+            </Option>
+            <Option value="favorite">
+              <StarFilled style={{ color: '#faad14', marginRight: 4 }} />已收藏
+            </Option>
+          </Select>
 
           <Button
             type="primary"
@@ -359,6 +411,7 @@ function ImageLibrary() {
           onChange: handlePageChange,
         }}
         onFavorite={handleFavorite}
+        onLike={handleLike}
         onItemClick={selectMode ? null : handleSlideshow}
         onDelete={handleDelete}
         onPreview={handlePreview}

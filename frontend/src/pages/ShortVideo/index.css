@@ -39,7 +39,25 @@
 .back-btn { color: white; font-size: 16px; }
 .back-btn:hover { color: #fb7299; }
 
-.filter-controls { display: flex; align-items: center; gap: 12px; }
+.filter-controls { display: flex; align-items: center; gap: 8px; }
+.filter-controls .ant-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+.filter-controls .ant-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: white;
+}
+.filter-controls .ant-btn-primary {
+  background: #fb7299;
+  border-color: #fb7299;
+}
+.filter-controls .ant-btn-primary:hover {
+  background: #ff85a7;
+  border-color: #ff85a7;
+}
 .filter-controls .ant-select .ant-select-selector {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.3);

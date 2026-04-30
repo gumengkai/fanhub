@@ -28,18 +28,18 @@ API 地址：http://<NAS IP>:5000/api/
 
 ```bash
 docker run -d \
-    --name funhub \
+    --name fanhub \
     --restart unless-stopped \
     -p 8080:8080 \
     -p 5000:5000 \
-    -v /volume1/docker/funhub/storage:/app/storage \
+    -v /volume1/docker/fanhub/storage:/app/storage \
     -v /volume1/media:/media:ro \
     -e FLASK_ENV=production \
     -e SECRET_KEY=$(openssl rand -hex 32) \
-    -e DATABASE_PATH=/app/storage/database/funhub.db \
+    -e DATABASE_PATH=/app/storage/database/fanhub.db \
     -e THUMBNAIL_FOLDER=/app/storage/thumbnails \
     -e CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,http://<你的 NAS IP>:8080,http://<你的 NAS IP>:5000" \
-    funhub:latest
+    fanhub:latest
 ```
 
 ### 验证 API 访问

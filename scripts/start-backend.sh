@@ -1,5 +1,5 @@
 #!/bin/bash
-# FunHub 后端开发启动脚本
+# fanhub 后端开发启动脚本
 # 启动 Flask 后端服务（开发模式）
 
 set -e
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_DIR/backend"
 
-echo "🚀 FunHub 后端开发服务"
+echo "🚀 fanhub 后端开发服务"
 echo "======================"
 echo "📁 项目目录：$PROJECT_DIR"
 echo ""
@@ -29,7 +29,7 @@ source "$BACKEND_DIR/venv/bin/activate"
 export FLASK_APP=run.py
 export FLASK_ENV=development
 export PYTHONUNBUFFERED=1
-export DATABASE_PATH="$PROJECT_DIR/storage/database/funhub.db"
+export DATABASE_PATH="$PROJECT_DIR/storage/database/fanhub.db"
 export THUMBNAIL_FOLDER="$PROJECT_DIR/storage/thumbnails"
 export CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080"
 export SECRET_KEY="dev-secret-key-for-local-development"

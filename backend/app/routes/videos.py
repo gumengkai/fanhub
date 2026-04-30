@@ -1,7 +1,7 @@
 import os
 from flask import Blueprint, request, jsonify, send_file, Response, current_app
 from sqlalchemy import desc, asc, func
-from ..models import db, Video, Tag, WatchHistory
+from ..models import db, Video, Tag, WatchHistory, Source
 import io
 from PIL import Image as PILImage, ImageDraw, ImageFont
 
@@ -16,7 +16,7 @@ def generate_placeholder(text="No Video", color=(51, 51, 51), text_color=(255, 2
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
     except:
         font = ImageFont.load_default()
-    
+
     # Center text
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
@@ -24,7 +24,7 @@ def generate_placeholder(text="No Video", color=(51, 51, 51), text_color=(255, 2
     x = (320 - text_width) // 2
     y = (180 - text_height) // 2
     draw.text((x, y), text, fill=text_color, font=font)
-    
+
     img_io = io.BytesIO()
     img.save(img_io, 'JPEG', quality=85)
     img_io.seek(0)
@@ -43,8 +43,23 @@ def get_videos():
     tag_id = request.args.get('tag_id', type=int)
     favorite = request.args.get('favorite')
     unwatched = request.args.get('unwatched')
+    liked = request.args.get('liked')
 
-    query = Video.query
+    # 获取非douyin类型的来源ID列表
+    non_douyin_sources = Source.query.filter(Source.media_type != 'douyin').all()
+    non_douyin_source_ids = [s.id for s in non_douyin_sources]
+
+    # 如果没有非douyin来源，返回空结果
+    if not non_douyin_source_ids:
+        return jsonify({
+            'items': [],
+            'total': 0,
+            'pages': 0,
+            'current_page': page,
+            'per_page': per_page
+        })
+
+    query = Video.query.filter(Video.source_id.in_(non_douyin_source_ids))
 
     if search:
         query = query.filter(Video.title.ilike(f'%{search}%'))
@@ -59,6 +74,10 @@ def get_videos():
         # 处理 'true', '1', 1 等值为 True
         is_fav = str(favorite).lower() in ('true', '1', 'yes', 'on')
         query = query.filter(Video.is_favorite == is_fav)
+
+    if liked is not None:
+        is_liked_val = str(liked).lower() in ('true', '1', 'yes', 'on')
+        query = query.filter(Video.is_liked == is_liked_val)
 
     if unwatched is not None:
         # 筛选从未观看的视频（没有观看历史记录）
@@ -196,6 +215,18 @@ def toggle_favorite(video_id):
     return jsonify({
         'message': 'Favorite status updated',
         'is_favorite': video.is_favorite
+    })
+
+
+@videos_bp.route('/<int:video_id>/like', methods=['POST'])
+def toggle_like(video_id):
+    """Toggle like status."""
+    video = Video.query.get_or_404(video_id)
+    video.is_liked = not video.is_liked
+    db.session.commit()
+    return jsonify({
+        'message': 'Like status updated',
+        'is_liked': video.is_liked
     })
 
 

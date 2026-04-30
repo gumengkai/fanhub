@@ -21,10 +21,20 @@ class HistoryViewModel @Inject constructor(
     private val historyRepository: HistoryRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HistoryUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(HistoryUiState(isLoading = false))
     val uiState = _uiState.asStateFlow()
 
-    init { load() }
+    private var isInitialized = false
+
+    /**
+     * 延迟初始化，在界面准备好后再加载数据
+     */
+    fun initialize() {
+        if (!isInitialized) {
+            isInitialized = true
+            load()
+        }
+    }
 
     fun load() {
         viewModelScope.launch {
