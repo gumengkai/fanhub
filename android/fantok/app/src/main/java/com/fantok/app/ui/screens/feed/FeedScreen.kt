@@ -272,21 +272,23 @@ fun FeedScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 筛选按钮组（移到最上面）
+                    // 筛选按钮 - 点击循环切换：全部 -> 喜欢 -> 收藏 -> 全部
+                    val filterButtonText = when (uiState.filterType) {
+                        "liked" -> "喜欢"
+                        "favorite" -> "收藏"
+                        else -> "全部"
+                    }
                     FilterButton(
-                        text = "全部",
-                        isSelected = uiState.filterType == "all",
-                        onClick = { viewModel.setFilterType("all") }
-                    )
-                    FilterButton(
-                        text = "喜欢",
-                        isSelected = uiState.filterType == "liked",
-                        onClick = { viewModel.setFilterType("liked") }
-                    )
-                    FilterButton(
-                        text = "收藏",
-                        isSelected = uiState.filterType == "favorite",
-                        onClick = { viewModel.setFilterType("favorite") }
+                        text = filterButtonText,
+                        isSelected = uiState.filterType != "all",
+                        onClick = {
+                            val nextType = when (uiState.filterType) {
+                                "all" -> "liked"
+                                "liked" -> "favorite"
+                                else -> "all"
+                            }
+                            viewModel.setFilterType(nextType)
+                        }
                     )
 
                     // 分隔线
@@ -295,7 +297,6 @@ fun FeedScreen(
                             .width(24.dp)
                             .height(1.dp)
                             .background(Color.White.copy(alpha = 0.3f))
-                            .padding(vertical = 4.dp)
                     )
 
                     // 喜欢
