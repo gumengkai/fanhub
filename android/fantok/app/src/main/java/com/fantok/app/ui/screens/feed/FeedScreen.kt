@@ -289,7 +289,7 @@ fun FeedScreen(
                         }
                     }
 
-                    // 计数器 - 显示当前索引/当前播放列表总数（筛选后）以及总视频数
+                    // 计数器 - 根据筛选条件显示相应的数量
                     Box(
                         modifier = Modifier.align(Alignment.TopEnd)
                     ) {
@@ -304,10 +304,28 @@ fun FeedScreen(
                                 fontWeight = FontWeight.Medium,
                                 color = Color.White.copy(alpha = 0.8f)
                             )
-                            // 总视频数（后台同步中显示总数）
-                            if (uiState.totalCount > 0) {
+                            // 根据筛选条件显示相应的总数量
+                            val filterLabel = when (uiState.filterType) {
+                                "liked" -> "喜欢"
+                                "favorite" -> "收藏"
+                                else -> "全部"
+                            }
+                            val totalText = when (uiState.filterType) {
+                                "liked" -> "共${uiState.playlist.size}个喜欢"
+                                "favorite" -> "共${uiState.playlist.size}个收藏"
+                                else -> "共${uiState.totalCount}个视频"
+                            }
+                            if (uiState.filterType == "all" && uiState.totalCount > 0) {
+                                // 全部视频显示总数
                                 Text(
-                                    text = "共${uiState.totalCount}个视频",
+                                    text = totalText,
+                                    fontSize = 10.sp,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            } else if (uiState.filterType != "all") {
+                                // 喜欢/收藏显示筛选后的数量
+                                Text(
+                                    text = totalText,
                                     fontSize = 10.sp,
                                     color = Color.White.copy(alpha = 0.6f)
                                 )
