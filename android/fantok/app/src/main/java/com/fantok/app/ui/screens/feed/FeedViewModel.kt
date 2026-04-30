@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fantok.app.data.api.ApiService
 import com.fantok.app.data.model.Video
+import com.fantok.app.data.repository.VideoCacheRepository
 import com.fantok.app.player.PlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,19 +15,22 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class FeedUiState(
-    val allVideos: List<Video> = emptyList(),      // 所有视频（原始数据）
+    val allVideos: List<Video> = emptyList(),      // 所有视频（从本地缓存）
     val playlist: List<Video> = emptyList(),       // 当前播放列表（筛选后）
     val currentIndex: Int = 0,
     val isLoading: Boolean = false,
+    val isSyncing: Boolean = false,                // 后台同步中
     val error: String? = null,
     val filterType: String = "all",                // all/liked/favorite
     val isRandom: Boolean = false,
-    val showControls: Boolean = true
+    val showControls: Boolean = true,
+    val totalCount: Int = 0                      // 总视频数
 )
 
 @HiltViewModel
 class FeedViewModel @Inject constructor(
     private val apiService: ApiService,
+    private val videoCacheRepository: VideoCacheRepository,
     val playerManager: PlayerManager
 ) : ViewModel() {
 
@@ -37,13 +41,15 @@ class FeedViewModel @Inject constructor(
     private var pendingStartVideoId: Int? = null
 
     /**
-     * 延迟初始化，在界面准备好后再加载数据
+     * 初始化：先加载本地缓存，再后台同步
      */
     fun initialize(startVideoId: Int? = null) {
         if (!isInitialized) {
             isInitialized = true
             pendingStartVideoId = startVideoId
-            loadAllVideos()
+            loadFromCache()
+            // 后台同步最新数据
+            syncFromServer()
         }
     }
 
@@ -51,42 +57,42 @@ class FeedViewModel @Inject constructor(
      * 重置并重新初始化（用于导航时重新加载）
      */
     fun resetAndInitialize(filterType: String, startVideoId: Int? = null) {
-        // 重置初始化状态
         isInitialized = false
-        // 更新筛选类型
         _uiState.update { it.copy(filterType = filterType) }
-        // 重新初始化
         initialize(startVideoId)
     }
 
     /**
-     * 加载全部视频（参考FanHub实现）
+     * 从本地缓存加载视频
      */
-    private fun loadAllVideos() {
+    private fun loadFromCache() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                // 先获取第一页以知道总数
-                val firstResponse = apiService.getDouyinVideos(perPage = 1)
-                val total = firstResponse.total
+                // 从本地缓存获取所有视频
+                val cachedVideos = videoCacheRepository.getCachedVideos("all")
 
-                if (total == 0) {
+                if (cachedVideos.isEmpty()) {
+                    // 缓存为空，等待服务器同步
                     _uiState.update {
                         it.copy(
                             allVideos = emptyList(),
                             playlist = emptyList(),
+                            isLoading = true, // 保持loading状态等待同步
+                            error = null
+                        )
+                    }
+                } else {
+                    // 使用缓存数据
+                    _uiState.update {
+                        it.copy(
+                            allVideos = cachedVideos,
+                            totalCount = cachedVideos.size,
                             isLoading = false
                         )
                     }
-                    return@launch
+                    applyFilter(keepCurrentVideo = null)
                 }
-
-                // 获取全部视频
-                val response = apiService.getDouyinVideos(perPage = total)
-                val videos = response.items
-
-                _uiState.update { it.copy(allVideos = videos, isLoading = false) }
-                applyFilter(keepCurrentVideo = null)
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
@@ -94,7 +100,80 @@ class FeedViewModel @Inject constructor(
     }
 
     /**
-     * 应用筛选条件（本地筛选，参考FanHub）
+     * 从服务器同步数据到本地缓存（分批加载）
+     */
+    private fun syncFromServer() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSyncing = true) }
+            try {
+                // 先获取总数
+                val firstResponse = apiService.getDouyinVideos(perPage = 1)
+                val total = firstResponse.total
+
+                if (total == 0) {
+                    videoCacheRepository.clearCache()
+                    _uiState.update {
+                        it.copy(
+                            allVideos = emptyList(),
+                            playlist = emptyList(),
+                            isLoading = false,
+                            isSyncing = false,
+                            totalCount = 0
+                        )
+                    }
+                    return@launch
+                }
+
+                // 分批加载（每批500个）
+                val batchSize = 500
+                val allVideos = mutableListOf<Video>()
+                val totalPages = (total + batchSize - 1) / batchSize
+
+                for (page in 1..totalPages) {
+                    try {
+                        val response = apiService.getDouyinVideos(
+                            page = page,
+                            perPage = batchSize
+                        )
+                        allVideos.addAll(response.items)
+
+                        // 保存到本地缓存
+                        videoCacheRepository.saveVideos(allVideos.toList())
+
+                        // 更新UI（首次加载时）
+                        if (page == 1 || _uiState.value.allVideos.isEmpty()) {
+                            _uiState.update {
+                                it.copy(
+                                    allVideos = allVideos.toList(),
+                                    totalCount = total
+                                )
+                            }
+                            applyFilter(keepCurrentVideo = null)
+                        }
+                    } catch (e: Exception) {
+                        // 继续加载下一批
+                    }
+                }
+
+                // 最终更新
+                _uiState.update {
+                    it.copy(
+                        allVideos = allVideos.toList(),
+                        totalCount = total,
+                        isLoading = false,
+                        isSyncing = false
+                    )
+                }
+                applyFilter(keepCurrentVideo = null)
+
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
+    /**
+     * 应用筛选条件（本地筛选）
      */
     private fun applyFilter(keepCurrentVideo: Video? = null) {
         val allVideos = _uiState.value.allVideos
@@ -148,7 +227,7 @@ class FeedViewModel @Inject constructor(
     }
 
     /**
-     * 切换随机/顺序模式（参考FanHub实现）
+     * 切换随机/顺序模式
      */
     fun toggleRandomMode() {
         val state = _uiState.value
@@ -203,7 +282,7 @@ class FeedViewModel @Inject constructor(
     }
 
     /**
-     * 喜欢/取消喜欢（参考FanHub，更新allVideos和playlist）
+     * 喜欢/取消喜欢
      */
     fun toggleLike(videoId: Int) {
         viewModelScope.launch {
@@ -211,6 +290,9 @@ class FeedViewModel @Inject constructor(
                 val response = apiService.toggleLike(videoId)
                 if (response.isSuccessful) {
                     val isLiked = (response.body()?.get("is_liked") as? Boolean) ?: false
+                    // 更新本地缓存
+                    videoCacheRepository.updateLikeStatus(videoId, isLiked)
+                    // 更新UI状态
                     _uiState.update { state ->
                         val updatedAllVideos = state.allVideos.map { video ->
                             if (video.id == videoId) video.copy(isLiked = isLiked) else video
@@ -226,7 +308,7 @@ class FeedViewModel @Inject constructor(
     }
 
     /**
-     * 收藏/取消收藏（参考FanHub，更新allVideos和playlist）
+     * 收藏/取消收藏
      */
     fun toggleFavorite(videoId: Int) {
         viewModelScope.launch {
@@ -234,6 +316,9 @@ class FeedViewModel @Inject constructor(
                 val response = apiService.toggleFavorite(videoId)
                 if (response.isSuccessful) {
                     val isFavorite = (response.body()?.get("is_favorite") as? Boolean) ?: false
+                    // 更新本地缓存
+                    videoCacheRepository.updateFavoriteStatus(videoId, isFavorite)
+                    // 更新UI状态
                     _uiState.update { state ->
                         val updatedAllVideos = state.allVideos.map { video ->
                             if (video.id == videoId) video.copy(isFavorite = isFavorite) else video
@@ -255,14 +340,18 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 apiService.deleteVideo(videoId)
+                // 从本地缓存删除
+                val updatedAllVideos = _uiState.value.allVideos.filter { it.id != videoId }
+                videoCacheRepository.saveVideos(updatedAllVideos)
+                // 更新UI
                 _uiState.update { state ->
-                    val updatedAllVideos = state.allVideos.filter { it.id != videoId }
                     val updatedPlaylist = state.playlist.filter { it.id != videoId }
                     val newIndex = if (state.currentIndex >= updatedPlaylist.size) 0 else state.currentIndex
                     state.copy(
                         allVideos = updatedAllVideos,
                         playlist = updatedPlaylist,
-                        currentIndex = newIndex
+                        currentIndex = newIndex,
+                        totalCount = updatedAllVideos.size
                     )
                 }
                 // 播放下一个
@@ -278,7 +367,7 @@ class FeedViewModel @Inject constructor(
      * 刷新数据
      */
     fun refresh() {
-        loadAllVideos()
+        syncFromServer()
     }
 
     override fun onCleared() {

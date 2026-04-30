@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.fantok.app.data.api.ApiService
 import com.fantok.app.data.model.Video
 import com.fantok.app.data.local.SettingsDataStore
+import com.fantok.app.data.repository.VideoCacheRepository
+import com.fantok.app.data.repository.toVideo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +26,8 @@ data class ProfileUiState(
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val apiService: ApiService,
-    private val settingsDataStore: SettingsDataStore
+    private val settingsDataStore: SettingsDataStore,
+    private val videoCacheRepository: VideoCacheRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState(isLoading = false))
@@ -38,7 +41,7 @@ class ProfileViewModel @Inject constructor(
     fun initialize() {
         if (!isInitialized) {
             isInitialized = true
-            loadData()
+            loadFromCache()
         }
     }
 
@@ -46,19 +49,24 @@ class ProfileViewModel @Inject constructor(
         return settingsDataStore.getServerUrl()
     }
 
-    private fun loadData() {
+    /**
+     * 从本地缓存加载数据
+     */
+    private fun loadFromCache() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val likedResponse = apiService.getDouyinVideos(liked = true, perPage = 1000)
-                val favoriteResponse = apiService.getDouyinVideos(favorite = true, perPage = 1000)
-                val stats = apiService.getDouyinStats()
+                // 从本地缓存获取喜欢/收藏的视频
+                val likedVideos = videoCacheRepository.getLikedVideos().first().map { it.toVideo() }
+                val favoriteVideos = videoCacheRepository.getFavoriteVideos().first().map { it.toVideo() }
+                val likedCount = videoCacheRepository.getLikedCount()
+                val favoriteCount = videoCacheRepository.getFavoriteCount()
 
                 _uiState.value = ProfileUiState(
-                    likedVideos = likedResponse.items,
-                    favoriteVideos = favoriteResponse.items,
-                    likedCount = stats.liked,
-                    favoriteCount = stats.favorite,
+                    likedVideos = likedVideos,
+                    favoriteVideos = favoriteVideos,
+                    likedCount = likedCount,
+                    favoriteCount = favoriteCount,
                     isLoading = false
                 )
             } catch (e: Exception) {
