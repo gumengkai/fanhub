@@ -53,13 +53,34 @@ class FeedViewModel @Inject constructor(
             try {
                 // 根据筛选条件从API获取数据
                 val filterType = _uiState.value.filterType
-                val response = when (filterType) {
-                    "liked" -> apiService.getDouyinVideos(liked = true, perPage = 1000)
-                    "favorite" -> apiService.getDouyinVideos(favorite = true, perPage = 1000)
-                    else -> apiService.getDouyinVideos(perPage = 500)
+
+                // 先获取第一页和总数
+                val firstResponse = when (filterType) {
+                    "liked" -> apiService.getDouyinVideos(liked = true, perPage = 100)
+                    "favorite" -> apiService.getDouyinVideos(favorite = true, perPage = 100)
+                    else -> apiService.getDouyinVideos(perPage = 100)
                 }
 
-                val videos = response.items
+                val total = firstResponse.total
+                var videos = firstResponse.items.toMutableList()
+
+                // 如果还有更多，继续加载
+                if (total > videos.size) {
+                    val remainingPages = (total - videos.size + 99) / 100
+                    for (page in 2..minOf(remainingPages + 1, 10)) { // 最多加载1000个
+                        try {
+                            val response = when (filterType) {
+                                "liked" -> apiService.getDouyinVideos(page = page, liked = true, perPage = 100)
+                                "favorite" -> apiService.getDouyinVideos(page = page, favorite = true, perPage = 100)
+                                else -> apiService.getDouyinVideos(page = page, perPage = 100)
+                            }
+                            videos.addAll(response.items)
+                        } catch (e: Exception) {
+                            break
+                        }
+                    }
+                }
+
                 allVideos = videos
 
                 // 随机排序

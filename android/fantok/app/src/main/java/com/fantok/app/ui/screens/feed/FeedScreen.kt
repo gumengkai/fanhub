@@ -110,7 +110,10 @@ fun FeedScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var videoToDelete by remember { mutableStateOf<Video?>(null) }
 
-    val pagerState = rememberPagerState(pageCount = { uiState.playlist.size })
+    val pagerState = rememberPagerState(
+        initialPage = uiState.currentIndex,
+        pageCount = { uiState.playlist.size }
+    )
 
     LaunchedEffect(uiState.currentIndex) {
         if (pagerState.settledPage != uiState.currentIndex && uiState.currentIndex < uiState.playlist.size) {
