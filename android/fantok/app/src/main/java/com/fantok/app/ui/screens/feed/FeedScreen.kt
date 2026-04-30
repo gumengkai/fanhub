@@ -289,17 +289,38 @@ fun FeedScreen(
                         }
                     }
 
-                    // 计数器
+                    // 计数器 - 显示当前索引/当前播放列表总数（筛选后）以及总视频数
                     Box(
                         modifier = Modifier.align(Alignment.TopEnd)
                     ) {
-                        Text(
-                            text = "${uiState.currentIndex + 1} / ${uiState.playlist.size}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f),
+                        Column(
+                            horizontalAlignment = Alignment.End,
                             modifier = Modifier.padding(top = 48.dp)
-                        )
+                        ) {
+                            // 当前播放列表计数
+                            Text(
+                                text = "${uiState.currentIndex + 1} / ${uiState.playlist.size}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                            // 总视频数（后台同步中显示总数）
+                            if (uiState.totalCount > 0) {
+                                Text(
+                                    text = "共${uiState.totalCount}个视频",
+                                    fontSize = 10.sp,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            }
+                            // 同步中提示
+                            if (uiState.isSyncing) {
+                                Text(
+                                    text = "同步中...",
+                                    fontSize = 10.sp,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
                     }
                 }
             }
