@@ -48,13 +48,24 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                // 根据筛选类型加载对应数据
-                val response = when (_uiState.value.filterType) {
-                    "liked" -> apiService.getDouyinVideos(liked = true, perPage = 1000)
-                    "favorite" -> apiService.getDouyinVideos(favorite = true, perPage = 1000)
-                    else -> apiService.getDouyinVideos(perPage = 1000)
+                // 先获取总数
+                val firstResponse = apiService.getDouyinVideos(perPage = 1)
+                val total = firstResponse.total
+
+                if (total == 0) {
+                    allVideos = emptyList()
+                    _uiState.value = _uiState.value.copy(
+                        playlist = emptyList(),
+                        isLoading = false,
+                        error = null
+                    )
+                    return@launch
                 }
+
+                // 加载全部视频
+                val response = apiService.getDouyinVideos(perPage = total)
                 allVideos = response.items
+
                 applyFilter()
                 _uiState.value = _uiState.value.copy(isLoading = false, error = null)
             } catch (e: Exception) {
@@ -67,11 +78,20 @@ class FeedViewModel @Inject constructor(
     }
 
     private fun applyFilter() {
-        // API已经返回筛选后的数据，只需要处理随机排序
-        val playlist = if (_uiState.value.isRandom && allVideos.isNotEmpty()) {
-            allVideos.shuffled()
+        // 在本地进行筛选和随机
+        var filtered = allVideos
+
+        // 筛选
+        when (_uiState.value.filterType) {
+            "liked" -> filtered = allVideos.filter { it.isLiked }
+            "favorite" -> filtered = allVideos.filter { it.isFavorite }
+        }
+
+        // 随机排序
+        val playlist = if (_uiState.value.isRandom && filtered.isNotEmpty()) {
+            filtered.shuffled()
         } else {
-            allVideos
+            filtered
         }
 
         _uiState.value = _uiState.value.copy(

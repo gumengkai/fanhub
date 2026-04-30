@@ -20,6 +20,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -246,19 +249,56 @@ fun FeedScreen(
                 }
             }
 
-            // 顶部计数器
+            // 顶部控制栏 - 左上方下拉筛选
             if (uiState.showControls) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 16.dp, end = 16.dp)
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = "${uiState.currentIndex + 1} / ${uiState.playlist.size}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 筛选下拉按钮
+                        FilterDropdown(
+                            currentFilter = uiState.filterType,
+                            onFilterSelected = { viewModel.setFilterType(it) }
+                        )
+
+                        // 随机/顺序切换
+                        IconButton(
+                            onClick = { viewModel.toggleRandomMode() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Shuffle,
+                                contentDescription = if (uiState.isRandom) "随机" else "顺序",
+                                tint = if (uiState.isRandom) DouyinRed else Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // 计数器
+                    Box(
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Text(
+                            text = "${uiState.currentIndex + 1} / ${uiState.playlist.size}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(top = 48.dp)
+                        )
+                    }
                 }
             }
 
@@ -269,35 +309,9 @@ fun FeedScreen(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .padding(end = 16.dp, bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 筛选按钮 - 点击循环切换：全部 -> 喜欢 -> 收藏 -> 全部
-                    val filterButtonText = when (uiState.filterType) {
-                        "liked" -> "喜欢"
-                        "favorite" -> "收藏"
-                        else -> "全部"
-                    }
-                    FilterButton(
-                        text = filterButtonText,
-                        isSelected = uiState.filterType != "all",
-                        onClick = {
-                            val nextType = when (uiState.filterType) {
-                                "all" -> "liked"
-                                "liked" -> "favorite"
-                                else -> "all"
-                            }
-                            viewModel.setFilterType(nextType)
-                        }
-                    )
-
-                    // 分隔线
-                    Box(
-                        modifier = Modifier
-                            .width(24.dp)
-                            .height(1.dp)
-                            .background(Color.White.copy(alpha = 0.3f))
-                    )
 
                     // 喜欢
                     ActionButtonVertical(
@@ -451,38 +465,69 @@ private fun ActionButtonVertical(
 }
 
 @Composable
-private fun FilterButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
+private fun FilterDropdown(
+    currentFilter: String,
+    onFilterSelected: (String) -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
-    ) {
-        Box(
+    var expanded by remember { mutableStateOf(false) }
+    val filterText = when (currentFilter) {
+        "liked" -> "喜欢"
+        "favorite" -> "收藏"
+        else -> "全部"
+    }
+
+    Box {
+        Row(
             modifier = Modifier
-                .size(40.dp)
                 .background(
-                    if (isSelected) DouyinRed.copy(alpha = 0.9f)
-                    else Color.White.copy(alpha = 0.15f),
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
+                    Color.Black.copy(alpha = 0.5f),
+                    RoundedCornerShape(20.dp)
+                )
+                .clickable { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = text.take(1),
+                text = filterText,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = "筛选",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = text,
-            fontSize = 11.sp,
-            color = if (isSelected) DouyinRed else Color.White.copy(alpha = 0.9f)
-        )
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
+        ) {
+            DropdownMenuItem(
+                text = { Text("全部视频", color = Color.White) },
+                onClick = {
+                    onFilterSelected("all")
+                    expanded = false
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("喜欢的视频", color = Color.White) },
+                onClick = {
+                    onFilterSelected("liked")
+                    expanded = false
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("收藏的视频", color = Color.White) },
+                onClick = {
+                    onFilterSelected("favorite")
+                    expanded = false
+                }
+            )
+        }
     }
 }
 
