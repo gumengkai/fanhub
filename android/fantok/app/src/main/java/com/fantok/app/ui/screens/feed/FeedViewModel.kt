@@ -67,17 +67,11 @@ class FeedViewModel @Inject constructor(
     }
 
     private fun applyFilter() {
-        var filtered = allVideos
-        if (_uiState.value.filterType == "liked") {
-            filtered = allVideos.filter { it.isLiked }
-        } else if (_uiState.value.filterType == "favorite") {
-            filtered = allVideos.filter { it.isFavorite }
-        }
-
-        val playlist = if (_uiState.value.isRandom && filtered.isNotEmpty()) {
-            filtered.shuffled()
+        // API已经返回筛选后的数据，只需要处理随机排序
+        val playlist = if (_uiState.value.isRandom && allVideos.isNotEmpty()) {
+            allVideos.shuffled()
         } else {
-            filtered
+            allVideos
         }
 
         _uiState.value = _uiState.value.copy(

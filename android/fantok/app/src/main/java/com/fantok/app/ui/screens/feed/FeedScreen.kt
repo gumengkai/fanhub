@@ -246,72 +246,19 @@ fun FeedScreen(
                 }
             }
 
-            // 顶部控制栏 - 抖音风格
+            // 顶部计数器
             if (uiState.showControls) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)
-                            )
-                        )
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .align(Alignment.TopEnd)
+                        .padding(top = 16.dp, end = 16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 筛选按钮组
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FilterChip(
-                                text = "全部",
-                                isSelected = uiState.filterType == "all",
-                                onClick = { viewModel.setFilterType("all") }
-                            )
-                            FilterChip(
-                                text = "喜欢",
-                                isSelected = uiState.filterType == "liked",
-                                onClick = { viewModel.setFilterType("liked") }
-                            )
-                            FilterChip(
-                                text = "收藏",
-                                isSelected = uiState.filterType == "favorite",
-                                onClick = { viewModel.setFilterType("favorite") }
-                            )
-                        }
-
-                        // 随机/顺序切换
-                        IconButton(
-                            onClick = { viewModel.toggleRandomMode() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Shuffle,
-                                contentDescription = if (uiState.isRandom) "随机" else "顺序",
-                                tint = if (uiState.isRandom) DouyinRed else Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    // 计数器
-                    Box(
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        Text(
-                            text = "${uiState.currentIndex + 1} / ${uiState.playlist.size}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(top = 48.dp)
-                        )
-                    }
+                    Text(
+                        text = "${uiState.currentIndex + 1} / ${uiState.playlist.size}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
                 }
             }
 
@@ -321,10 +268,36 @@ fun FeedScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 16.dp, bottom = 100.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                        .padding(end = 16.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // 筛选按钮组（移到最上面）
+                    FilterButton(
+                        text = "全部",
+                        isSelected = uiState.filterType == "all",
+                        onClick = { viewModel.setFilterType("all") }
+                    )
+                    FilterButton(
+                        text = "喜欢",
+                        isSelected = uiState.filterType == "liked",
+                        onClick = { viewModel.setFilterType("liked") }
+                    )
+                    FilterButton(
+                        text = "收藏",
+                        isSelected = uiState.filterType == "favorite",
+                        onClick = { viewModel.setFilterType("favorite") }
+                    )
+
+                    // 分隔线
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp)
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.3f))
+                            .padding(vertical = 4.dp)
+                    )
+
                     // 喜欢
                     ActionButtonVertical(
                         icon = if (currentVideo.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -472,6 +445,42 @@ private fun ActionButtonVertical(
             label,
             fontSize = 12.sp,
             color = color.copy(alpha = 0.9f)
+        )
+    }
+}
+
+@Composable
+private fun FilterButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    if (isSelected) DouyinRed.copy(alpha = 0.9f)
+                    else Color.White.copy(alpha = 0.15f),
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text.take(1),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            color = if (isSelected) DouyinRed else Color.White.copy(alpha = 0.9f)
         )
     }
 }
