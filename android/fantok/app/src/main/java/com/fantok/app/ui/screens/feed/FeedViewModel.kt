@@ -48,8 +48,9 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                // 先获取总数
-                val firstResponse = apiService.getDouyinVideos(perPage = 1)
+                // 分批加载视频，避免超时
+                val batchSize = 500
+                val firstResponse = apiService.getDouyinVideos(perPage = batchSize)
                 val total = firstResponse.total
 
                 if (total == 0) {
@@ -62,12 +63,29 @@ class FeedViewModel @Inject constructor(
                     return@launch
                 }
 
-                // 加载全部视频
-                val response = apiService.getDouyinVideos(perPage = total)
-                allVideos = response.items
-
+                // 先显示第一批
+                val videos = firstResponse.items.toMutableList()
+                allVideos = videos
                 applyFilter()
                 _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+
+                // 后台加载剩余视频
+                if (total > batchSize) {
+                    val remainingPages = (total - 1) / batchSize
+                    for (page in 2..remainingPages + 1) {
+                        try {
+                            val response = apiService.getDouyinVideos(page = page, perPage = batchSize)
+                            videos.addAll(response.items)
+                            allVideos = videos
+                            // 只在当前筛选为全部时更新播放列表
+                            if (_uiState.value.filterType == "all" && !_uiState.value.isRandom) {
+                                _uiState.value = _uiState.value.copy(playlist = videos)
+                            }
+                        } catch (e: Exception) {
+                            // 忽略加载错误，继续加载下一批
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
