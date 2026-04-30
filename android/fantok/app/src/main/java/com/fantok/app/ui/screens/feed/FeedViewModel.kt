@@ -34,12 +34,15 @@ class FeedViewModel @Inject constructor(
     private var allVideos: List<Video> = emptyList()
     private var isInitialized = false
 
+    private var pendingStartVideoId: Int? = null
+
     /**
      * 延迟初始化，在界面准备好后再加载数据
      */
-    fun initialize() {
+    fun initialize(startVideoId: Int? = null) {
         if (!isInitialized) {
             isInitialized = true
+            pendingStartVideoId = startVideoId
             loadVideos()
         }
     }
@@ -48,43 +51,41 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                // 分批加载视频，避免超时
-                val batchSize = 500
-                val firstResponse = apiService.getDouyinVideos(perPage = batchSize)
-                val total = firstResponse.total
-
-                if (total == 0) {
-                    allVideos = emptyList()
-                    _uiState.value = _uiState.value.copy(
-                        playlist = emptyList(),
-                        isLoading = false,
-                        error = null
-                    )
-                    return@launch
+                // 根据筛选条件从API获取数据
+                val filterType = _uiState.value.filterType
+                val response = when (filterType) {
+                    "liked" -> apiService.getDouyinVideos(liked = true, perPage = 1000)
+                    "favorite" -> apiService.getDouyinVideos(favorite = true, perPage = 1000)
+                    else -> apiService.getDouyinVideos(perPage = 500)
                 }
 
-                // 先显示第一批
-                val videos = firstResponse.items.toMutableList()
+                val videos = response.items
                 allVideos = videos
-                applyFilter()
-                _uiState.value = _uiState.value.copy(isLoading = false, error = null)
 
-                // 后台加载剩余视频
-                if (total > batchSize) {
-                    val remainingPages = (total - 1) / batchSize
-                    for (page in 2..remainingPages + 1) {
-                        try {
-                            val response = apiService.getDouyinVideos(page = page, perPage = batchSize)
-                            videos.addAll(response.items)
-                            allVideos = videos
-                            // 只在当前筛选为全部时更新播放列表
-                            if (_uiState.value.filterType == "all" && !_uiState.value.isRandom) {
-                                _uiState.value = _uiState.value.copy(playlist = videos)
-                            }
-                        } catch (e: Exception) {
-                            // 忽略加载错误，继续加载下一批
-                        }
-                    }
+                // 随机排序
+                val playlist = if (_uiState.value.isRandom && videos.isNotEmpty()) {
+                    videos.shuffled()
+                } else {
+                    videos
+                }
+
+                // 查找指定视频的起始位置
+                val startIndex = if (pendingStartVideoId != null && playlist.isNotEmpty()) {
+                    val index = playlist.indexOfFirst { it.id == pendingStartVideoId }
+                    if (index >= 0) index else 0
+                } else 0
+                pendingStartVideoId = null
+
+                _uiState.value = _uiState.value.copy(
+                    playlist = playlist,
+                    currentIndex = startIndex,
+                    isLoading = false,
+                    error = null
+                )
+
+                // Prepare video at startIndex
+                if (playlist.isNotEmpty()) {
+                    playerManager.prepareAt(startIndex, playlist)
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -96,31 +97,8 @@ class FeedViewModel @Inject constructor(
     }
 
     private fun applyFilter() {
-        // 在本地进行筛选和随机
-        var filtered = allVideos
-
-        // 筛选
-        when (_uiState.value.filterType) {
-            "liked" -> filtered = allVideos.filter { it.isLiked }
-            "favorite" -> filtered = allVideos.filter { it.isFavorite }
-        }
-
-        // 随机排序
-        val playlist = if (_uiState.value.isRandom && filtered.isNotEmpty()) {
-            filtered.shuffled()
-        } else {
-            filtered
-        }
-
-        _uiState.value = _uiState.value.copy(
-            playlist = playlist,
-            currentIndex = 0
-        )
-
-        // Prepare first video
-        if (playlist.isNotEmpty()) {
-            playerManager.prepareAt(0, playlist)
-        }
+        // 重新加载数据（API筛选）
+        loadVideos()
     }
 
     fun setFilterType(type: String) {

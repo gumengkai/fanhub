@@ -20,10 +20,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.fantok.app.ui.screens.feed.FeedScreen
 import com.fantok.app.ui.screens.profile.ProfileScreen
 import com.fantok.app.ui.theme.BackgroundBlack
@@ -33,7 +35,7 @@ import com.fantok.app.ui.theme.TextTertiary
 data class BottomNavItem(val route: String, val label: String, val icon: ImageVector)
 
 private val bottomNavItems = listOf(
-    BottomNavItem(Screen.Feed.route, "首页", Icons.Default.Home),
+    BottomNavItem("feed?filterType=all", "首页", Icons.Default.Home),
     BottomNavItem(Screen.Profile.route, "我", Icons.Default.Person)
 )
 
@@ -91,17 +93,31 @@ fun AppNavGraph() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Feed.route,
+            startDestination = "feed?filterType=all",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Feed.route) {
-                FeedScreen()
+            composable(
+                route = "feed?filterType={filterType}&startVideoId={startVideoId}",
+                arguments = listOf(
+                    navArgument("filterType") {
+                        type = NavType.StringType
+                        defaultValue = "all"
+                    },
+                    navArgument("startVideoId") {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    }
+                )
+            ) { backStackEntry ->
+                val filterType = backStackEntry.arguments?.getString("filterType") ?: "all"
+                val startVideoId = backStackEntry.arguments?.getInt("startVideoId")?.takeIf { it > 0 }
+                FeedScreen(initialFilterType = filterType, startVideoId = startVideoId)
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    onNavigateToVideo = { _, filterType ->
-                        navController.navigate(Screen.Feed.route) {
-                            popUpTo(Screen.Feed.route) { inclusive = true }
+                    onNavigateToVideo = { videoId, filterType ->
+                        navController.navigate("feed?filterType=$filterType&startVideoId=$videoId") {
+                            popUpTo("feed?filterType=all") { inclusive = true }
                         }
                     }
                 )

@@ -80,6 +80,7 @@ import kotlinx.coroutines.Dispatchers
 @Composable
 fun FeedScreen(
     initialFilterType: String = "all",
+    startVideoId: Int? = null,
     viewModel: FeedViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -89,7 +90,7 @@ fun FeedScreen(
         if (initialFilterType != "all" && initialFilterType != uiState.filterType) {
             viewModel.setFilterType(initialFilterType)
         }
-        viewModel.initialize()
+        viewModel.initialize(startVideoId)
     }
 
     SideEffect {
