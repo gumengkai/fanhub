@@ -183,7 +183,7 @@ fun FeedScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { viewModel.loadVideos() },
+                    onClick = { viewModel.refresh() },
                     colors = ButtonDefaults.buttonColors(containerColor = DouyinRed)
                 ) {
                     Text("重试", color = Color.White)
