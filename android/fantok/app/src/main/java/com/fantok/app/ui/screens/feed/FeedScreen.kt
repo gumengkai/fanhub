@@ -86,11 +86,9 @@ fun FeedScreen(
     val uiState by viewModel.uiState.collectAsState()
     val systemUiController = rememberSystemUiController()
 
-    LaunchedEffect(Unit) {
-        if (initialFilterType != "all" && initialFilterType != uiState.filterType) {
-            viewModel.setFilterType(initialFilterType)
-        }
-        viewModel.initialize(startVideoId)
+    // 使用key来确保每次参数变化时重新初始化
+    LaunchedEffect(initialFilterType, startVideoId) {
+        viewModel.resetAndInitialize(initialFilterType, startVideoId)
     }
 
     SideEffect {

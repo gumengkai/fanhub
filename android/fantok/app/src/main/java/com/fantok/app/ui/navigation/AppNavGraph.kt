@@ -117,7 +117,10 @@ fun AppNavGraph() {
                 ProfileScreen(
                     onNavigateToVideo = { videoId, filterType ->
                         navController.navigate("feed?filterType=$filterType&startVideoId=$videoId") {
-                            popUpTo("feed?filterType=all") { inclusive = true }
+                            // 弹出到Feed路由，但不销毁，这样返回时可以回到Profile
+                            popUpTo("feed?filterType={filterType}&startVideoId={startVideoId}") {
+                                inclusive = true
+                            }
                         }
                     }
                 )

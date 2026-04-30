@@ -48,6 +48,18 @@ class FeedViewModel @Inject constructor(
     }
 
     /**
+     * 重置并重新初始化（用于导航时重新加载）
+     */
+    fun resetAndInitialize(filterType: String, startVideoId: Int? = null) {
+        // 重置初始化状态
+        isInitialized = false
+        // 更新筛选类型
+        _uiState.update { it.copy(filterType = filterType) }
+        // 重新初始化
+        initialize(startVideoId)
+    }
+
+    /**
      * 加载全部视频（参考FanHub实现）
      */
     private fun loadAllVideos() {
