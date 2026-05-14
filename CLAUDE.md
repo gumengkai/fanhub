@@ -184,33 +184,98 @@ chmod +x deploy.sh
 
 ## Android 客户端
 
-### FanHub 应用
-- **语言**: Kotlin
+FanHub 项目包含三个 Android 应用，共享相同的技术栈但针对不同使用场景：
+
+### 应用对比
+
+| 应用 | 包名 | 定位 | 主要功能 |
+|------|------|------|----------|
+| **FanHub** | `com.fanhub.app` | 完整版媒体中心 | 视频库、图片库、短视频、个人中心 |
+| **FanPeak** | `com.fanpeak.app` | 精简短视频版 | 抖音风格短视频、个人中心 |
+| **FanTok** | `com.fantok.app` | 极简抖音版 | 纯短视频播放、直连后端 |
+
+### 技术栈
+- **语言**: Kotlin 2.0
 - **UI**: Jetpack Compose + Material3
 - **架构**: MVVM + Hilt DI
 - **网络**: Retrofit + OkHttp
 - **播放器**: Media3 ExoPlayer
 - **图片加载**: Coil
-- **功能**: 首页、视频库、标签筛选、个人中心、动态服务器配置
 
-### FanTok 应用（极简抖音）
-- **定位**: 纯抖音风格短视频播放器
-- **功能**: 沉浸式全屏播放、上下滑动切换、双击喜欢、收藏管理
-- **入口**: 仅显示抖音库数据 (Source.media_type='douyin')
-- **位置**: `android/fantok/`
-
-### 构建
-```bash
-# FanHub
-cd android && ./gradlew assembleDebug
-
-# FanTok
-cd android/fantok && ./gradlew assembleDebug
-
-# APK 输出到 /mnt/fan/apk/
+### 项目结构
+```
+android/
+├── app/                          # FanHub 完整版
+│   └── src/main/java/com/fanhub/app/
+│       ├── data/
+│       │   ├── api/             # API 接口 (Retrofit)
+│       │   ├── model/           # 数据模型
+│       │   ├── repository/      # 数据仓库
+│       │   └── local/           # 本地存储 (DataStore)
+│       ├── player/              # ExoPlayer 管理
+│       ├── ui/
+│       │   ├── screens/         # 页面
+│       │   │   ├── feed/        # 短视频 (VideoFeedItem.kt)
+│       │   │   ├── library/     # 视频库
+│       │   │   ├── home/        # 首页
+│       │   │   └── profile/     # 个人中心
+│       │   ├── components/      # 公共组件
+│       │   ├── theme/           # 主题
+│       │   └── navigation/      # 导航
+│       └── MainActivity.kt
+├── fanpeak/                      # FanPeak 精简版
+│   └── src/main/java/com/fanpeak/app/
+│       └── ... (类似结构)
+└── fantok/                       # FanTok 极简版
+    └── src/main/java/com/fantok/app/
+        └── ... (类似结构)
 ```
 
+### 构建命令
+```bash
+cd /home/gmk/fanhub/android
+
+# FanHub 完整版
+./gradlew :app:assembleRelease
+# APK: app/build/outputs/apk/release/fanhub-release.apk
+
+# FanPeak 精简版
+./gradlew :fanpeak:assembleRelease
+# APK: fanpeak/build/outputs/apk/release/fanpeak-release.apk
+
+# FanTok 极简版
+./gradlew :fantok:assembleRelease
+# APK: fantok/build/outputs/apk/release/fantok-release.apk
+
+# 复制到输出目录
+cp */build/outputs/apk/release/*-release.apk /mnt/fan/apk/
+```
+
+### 短视频页面 (VideoFeedItem)
+**文件位置**: `ui/screens/feed/VideoFeedItem.kt`
+
+**功能**:
+- 沉浸式全屏视频播放
+- 上下滑动切换视频 (VerticalPager)
+- 双击喜欢 (红心动画)
+- 侧边操作按钮 (喜欢/收藏/删除/全屏)
+- 底部进度条 + 倍速控制
+- 点击切换控制栏显示/隐藏
+
+**注意事项**:
+- 手势检测应放在视频区域，不要放在根 Box 上，否则会拦截按钮点击事件
+- 删除操作需更新播放器状态，避免播放已删除视频
+
 ## 更新日志
+
+### 2026-05-14
+- **Bug 修复**: Android 短视频页面删除按钮无响应
+  - **问题**: VideoFeedItem 根 Box 上的 `pointerInput` 手势检测拦截了所有子组件的点击事件，导致删除、喜欢、收藏等按钮无法响应
+  - **修复**: 将手势检测从根 Box 移至视频/缩略图区域，按钮可正常接收点击事件
+  - **影响模块**: FanHub (`android/app`)、FanPeak (`android/fanpeak`)、FanTok (`android/fantok`)
+  - **相关文件**:
+    - `VideoFeedItem.kt` - 手势检测位置调整
+    - `FeedViewModel.kt` - 删除操作增加响应处理和播放器状态更新
 
 ### 2026-04-29
 - 新增抖音库功能（独立于视频库）
