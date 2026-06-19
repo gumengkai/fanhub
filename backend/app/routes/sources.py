@@ -1,7 +1,7 @@
 import os
 from flask import Blueprint, request, jsonify
 from datetime import datetime
-from ..models import db, Source, Video, Image
+from ..models import db, Source, Video, Image, ScanLog
 from ..services.scanner import scan_source
 from ..services.nas_client import test_nas_connection
 
@@ -35,8 +35,8 @@ def create_source():
 
     # Validate media_type
     media_type = data.get('media_type', 'all')
-    if media_type not in ['all', 'video', 'image', 'douyin']:
-        return jsonify({'error': 'Invalid media_type. Must be "all", "video", "image", or "douyin"'}), 400
+    if media_type not in ['all', 'video', 'image', 'douyin', 'peak']:
+        return jsonify({'error': 'Invalid media_type. Must be "all", "video", "image", "douyin", or "peak"'}), 400
 
     # Validate path for local sources
     if data['type'] == 'local' and not os.path.exists(data['path']):
@@ -67,7 +67,7 @@ def update_source(source_id):
     if 'name' in data:
         source.name = data['name']
     if 'media_type' in data:
-        if data['media_type'] not in ['all', 'video', 'image', 'douyin']:
+        if data['media_type'] not in ['all', 'video', 'image', 'douyin', 'peak']:
             return jsonify({'error': 'Invalid media_type'}), 400
         source.media_type = data['media_type']
     if 'path' in data:
@@ -109,14 +109,77 @@ def scan_source_endpoint(source_id):
     source = Source.query.get_or_404(source_id)
 
     try:
-        stats = scan_source(source)
+        # 先创建扫描日志记录
+        scan_log = ScanLog(
+            source_id=source.id,
+            source_name=source.name,
+            status='running'
+        )
+        db.session.add(scan_log)
+        db.session.commit()
+
+        # 执行扫描
+        stats = scan_source(source, scan_log_id=scan_log.id)
         source.last_scan_at = datetime.utcnow()
         db.session.commit()
 
         return jsonify({
             'message': 'Scan completed successfully',
-            'stats': stats
+            'stats': stats,
+            'scan_log_id': scan_log.id
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@sources_bp.route('/scan-logs', methods=['GET'])
+def get_scan_logs():
+    """Get scan logs with pagination."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    source_id = request.args.get('source_id', type=int)
+
+    query = ScanLog.query
+    if source_id:
+        query = query.filter_by(source_id=source_id)
+
+    # 按开始时间倒序排列
+    query = query.order_by(ScanLog.started_at.desc())
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'items': [log.to_dict() for log in pagination.items],
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': page,
+        'per_page': per_page
+    })
+
+
+@sources_bp.route('/scan-logs/<int:log_id>', methods=['GET'])
+def get_scan_log(log_id):
+    """Get a single scan log by ID."""
+    log = ScanLog.query.get_or_404(log_id)
+    return jsonify(log.to_dict())
+
+
+@sources_bp.route('/scan-logs/<int:log_id>', methods=['DELETE'])
+def delete_scan_log(log_id):
+    """Delete a scan log."""
+    log = ScanLog.query.get_or_404(log_id)
+    db.session.delete(log)
+    db.session.commit()
+    return jsonify({'message': 'Scan log deleted successfully'})
+
+
+@sources_bp.route('/scan-logs/clear', methods=['POST'])
+def clear_scan_logs():
+    """Clear all scan logs."""
+    try:
+        count = ScanLog.query.delete()
+        db.session.commit()
+        return jsonify({'message': f'Cleared {count} scan logs'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

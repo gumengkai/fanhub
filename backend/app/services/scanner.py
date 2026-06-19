@@ -1,14 +1,22 @@
 import os
 from datetime import datetime
-from ..models import db, Video, Image, Source, WatchHistory, ThumbnailCache
+from ..models import db, Video, Image, Source, WatchHistory, ThumbnailCache, ScanLog
 
 # Supported file extensions (browser-compatible formats only)
-VIDEO_EXTENSIONS = {'.mp4', '.mov', '.m4v', '.webm', '.ogv', '.ogg'}
-IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif'}
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.m4v', '.webm', '.ogv', '.ogg', '.avi', '.mkv', '.flv', '.wmv', '.mpg', '.mpeg', '.3gp', '.ts', '.m2ts'}
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif', '.svg', '.ico', '.heic', '.heif', '.raw', '.cr2', '.nef', '.arw'}
 
 
-def scan_source(source):
-    """Scan a source directory for media files."""
+def scan_source(source, scan_log_id=None):
+    """Scan a source directory for media files.
+    
+    Args:
+        source: Source object to scan
+        scan_log_id: Optional scan log ID for tracking progress
+    
+    Returns:
+        dict: Statistics about the scan operation
+    """
     stats = {
         'videos_added': 0,
         'videos_updated': 0,
@@ -16,23 +24,81 @@ def scan_source(source):
         'images_added': 0,
         'images_updated': 0,
         'images_removed': 0,
-        'errors': []
+        'errors': [],
+        'details': []  # 详细操作记录
     }
 
-    if source.type == 'local':
-        # Scan based on media_type
-        # 'douyin' is treated as video-only
-        if source.media_type in ('all', 'video', 'douyin'):
-            scan_local_directory(source, stats, 'video')
-        if source.media_type in ('all', 'image'):
-            scan_local_directory(source, stats, 'image')
-    elif source.type == 'nas':
-        scan_nas_directory(source, stats)
+    # 创建扫描日志
+    scan_log = None
+    if scan_log_id is None:
+        scan_log = ScanLog(
+            source_id=source.id,
+            source_name=source.name,
+            status='running'
+        )
+        db.session.add(scan_log)
+        db.session.commit()
+        scan_log_id = scan_log.id
+    else:
+        scan_log = ScanLog.query.get(scan_log_id)
+
+    def update_scan_log():
+        """Update scan log with current stats"""
+        if scan_log:
+            scan_log.videos_added = stats['videos_added']
+            scan_log.videos_updated = stats['videos_updated']
+            scan_log.videos_removed = stats['videos_removed']
+            scan_log.images_added = stats['images_added']
+            scan_log.images_updated = stats['images_updated']
+            scan_log.images_removed = stats['images_removed']
+            scan_log.errors = stats['errors']
+            scan_log.details = stats['details']
+            db.session.commit()
+
+    try:
+        # 记录是否需要刷新词云（只有扫描视频库或图片库时才刷新）
+        should_refresh_wordcloud = source.media_type in ('all', 'video', 'image')
+
+        if source.type == 'local':
+            # Scan based on media_type
+            # 'douyin' and 'peak' are treated as video-only
+            if source.media_type in ('all', 'video', 'douyin', 'peak'):
+                scan_local_directory(source, stats, 'video', scan_log_id)
+                update_scan_log()
+            if source.media_type in ('all', 'image'):
+                scan_local_directory(source, stats, 'image', scan_log_id)
+                update_scan_log()
+        elif source.type == 'nas':
+            scan_nas_directory(source, stats)
+
+        # 扫描完成后刷新词云缓存（只在扫描视频库/图片库时）
+        if should_refresh_wordcloud:
+            try:
+                from ..models import WordCloudCache
+                new_version = WordCloudCache.increment_global_version()
+                print(f"[WordCloud] Cache refreshed after scanning source {source.name} (version: {new_version})")
+            except Exception as e:
+                print(f"[WordCloud] Failed to refresh cache: {e}")
+
+        # 标记扫描完成
+        if scan_log:
+            scan_log.status = 'completed'
+            scan_log.completed_at = datetime.utcnow()
+            db.session.commit()
+
+    except Exception as e:
+        # 标记扫描失败
+        if scan_log:
+            scan_log.status = 'failed'
+            scan_log.completed_at = datetime.utcnow()
+            scan_log.errors.append(str(e))
+            db.session.commit()
+        stats['errors'].append(f"Scan failed: {str(e)}")
 
     return stats
 
 
-def scan_local_directory(source, stats, media_type='all'):
+def scan_local_directory(source, stats, media_type='all', scan_log_id=None):
     """Scan a local directory for media files."""
     if not os.path.exists(source.path):
         stats['errors'].append(f"Path does not exist: {source.path}")
@@ -60,9 +126,13 @@ def scan_local_directory(source, stats, media_type='all'):
             ext = os.path.splitext(filename)[1].lower()
 
             if media_type in ('all', 'video') and ext in VIDEO_EXTENSIONS:
-                process_video_file(file_path, source, existing_videos if media_type != 'video' else {}, stats)
+                video = process_video_file(file_path, source, existing_videos, stats, scan_log_id)
+                if video:
+                    existing_videos[file_path] = video
             elif media_type in ('all', 'image') and ext in IMAGE_EXTENSIONS:
-                process_image_file(file_path, source, existing_images if media_type != 'image' else {}, stats)
+                image = process_image_file(file_path, source, existing_images, stats, scan_log_id)
+                if image:
+                    existing_images[file_path] = image
 
     # Remove database records for files that no longer exist on disk
     if media_type in ('all', 'video'):
@@ -73,6 +143,16 @@ def scan_local_directory(source, stats, media_type='all'):
 
         for video in removed_videos:
             try:
+                # 记录删除操作
+                stats['details'].append({
+                    'type': 'removed',
+                    'media_type': 'video',
+                    'path': video.path,
+                    'title': video.title,
+                    'was_favorite': video.is_favorite,
+                    'was_liked': video.is_liked
+                })
+
                 # Delete thumbnail file from disk
                 if video.thumbnail_path and os.path.exists(video.thumbnail_path):
                     try:
@@ -100,6 +180,16 @@ def scan_local_directory(source, stats, media_type='all'):
 
         for image in removed_images:
             try:
+                # 记录删除操作
+                stats['details'].append({
+                    'type': 'removed',
+                    'media_type': 'image',
+                    'path': image.path,
+                    'title': image.title,
+                    'was_favorite': image.is_favorite,
+                    'was_liked': image.is_liked
+                })
+
                 # Delete thumbnail file from disk
                 if image.thumbnail_path and os.path.exists(image.thumbnail_path):
                     try:
@@ -126,8 +216,13 @@ def scan_nas_directory(source, stats):
     stats['errors'].append("NAS scanning not yet implemented")
 
 
-def process_video_file(file_path, source, existing_videos, stats):
-    """Process a single video file."""
+def process_video_file(file_path, source, existing_videos, stats, scan_log_id=None):
+    """Process a single video file.
+    
+    Returns:
+        Video: The processed video object, or None if error
+    """
+    video = None
     try:
         file_stat = os.stat(file_path)
         file_size = file_stat.st_size
@@ -136,11 +231,21 @@ def process_video_file(file_path, source, existing_videos, stats):
         # Check if video already exists
         if file_path in existing_videos:
             video = existing_videos[file_path]
-            # Update if file has been modified
-            if video.updated_at and modified_time > video.updated_at:
+            # Update if file has been modified (使用 file_modified_at 而不是 updated_at)
+            if video.file_modified_at is None or modified_time > video.file_modified_at:
                 video.file_size = file_size
-                video.updated_at = datetime.utcnow()
+                video.file_modified_at = modified_time
+                # 保留原有的收藏和喜欢状态
                 stats['videos_updated'] += 1
+                stats['details'].append({
+                    'type': 'updated',
+                    'media_type': 'video',
+                    'path': file_path,
+                    'title': video.title,
+                    'kept_favorite': video.is_favorite,
+                    'kept_liked': video.is_liked
+                })
+                db.session.commit()
         else:
             # Extract video info
             video_info = get_video_info(file_path)
@@ -155,7 +260,9 @@ def process_video_file(file_path, source, existing_videos, stats):
                 width=video_info.get('width'),
                 height=video_info.get('height'),
                 thumbnail_path=None,
-                is_favorite=False
+                is_favorite=False,
+                is_liked=False,
+                file_modified_at=modified_time  # 记录文件修改时间
             )
             db.session.add(video)
             db.session.commit()  # Commit to get the ID
@@ -171,15 +278,36 @@ def process_video_file(file_path, source, existing_videos, stats):
                 print(f"Failed to generate thumbnail for {file_path}: {e}")
 
             stats['videos_added'] += 1
+            stats['details'].append({
+                'type': 'added',
+                'media_type': 'video',
+                'path': file_path,
+                'title': video.title,
+                'id': video.id
+            })
 
         db.session.commit()
 
     except Exception as e:
-        stats['errors'].append(f"Error processing video {file_path}: {str(e)}")
+        error_msg = f"Error processing video {file_path}: {str(e)}"
+        stats['errors'].append(error_msg)
+        stats['details'].append({
+            'type': 'error',
+            'media_type': 'video',
+            'path': file_path,
+            'error': str(e)
+        })
+    
+    return video
 
 
-def process_image_file(file_path, source, existing_images, stats):
-    """Process a single image file."""
+def process_image_file(file_path, source, existing_images, stats, scan_log_id=None):
+    """Process a single image file.
+    
+    Returns:
+        Image: The processed image object, or None if error
+    """
+    image = None
     try:
         file_stat = os.stat(file_path)
         file_size = file_stat.st_size
@@ -188,10 +316,21 @@ def process_image_file(file_path, source, existing_images, stats):
         # Check if image already exists
         if file_path in existing_images:
             image = existing_images[file_path]
-            # Update if file has been modified
-            if image.created_at and modified_time > image.created_at:
+            # Update if file has been modified (使用 file_modified_at 而不是 created_at)
+            if image.file_modified_at is None or modified_time > image.file_modified_at:
                 image.file_size = file_size
+                image.file_modified_at = modified_time
+                # 保留原有的收藏和喜欢状态
                 stats['images_updated'] += 1
+                stats['details'].append({
+                    'type': 'updated',
+                    'media_type': 'image',
+                    'path': file_path,
+                    'title': image.title,
+                    'kept_favorite': image.is_favorite,
+                    'kept_liked': image.is_liked
+                })
+                db.session.commit()
         else:
             # Get image dimensions
             image_info = get_image_info(file_path)
@@ -205,7 +344,9 @@ def process_image_file(file_path, source, existing_images, stats):
                 width=image_info.get('width'),
                 height=image_info.get('height'),
                 thumbnail_path=None,
-                is_favorite=False
+                is_favorite=False,
+                is_liked=False,
+                file_modified_at=modified_time  # 记录文件修改时间
             )
             db.session.add(image)
             db.session.commit()  # Commit to get the ID
@@ -221,11 +362,27 @@ def process_image_file(file_path, source, existing_images, stats):
                 print(f"Failed to generate thumbnail for {file_path}: {e}")
 
             stats['images_added'] += 1
+            stats['details'].append({
+                'type': 'added',
+                'media_type': 'image',
+                'path': file_path,
+                'title': image.title,
+                'id': image.id
+            })
 
         db.session.commit()
 
     except Exception as e:
-        stats['errors'].append(f"Error processing image {file_path}: {str(e)}")
+        error_msg = f"Error processing image {file_path}: {str(e)}"
+        stats['errors'].append(error_msg)
+        stats['details'].append({
+            'type': 'error',
+            'media_type': 'image',
+            'path': file_path,
+            'error': str(e)
+        })
+    
+    return image
 
 
 def get_video_info(file_path):

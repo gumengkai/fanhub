@@ -30,18 +30,20 @@ def create_app(config_class=Config):
     from app.routes.sources import sources_bp
     from app.routes.favorites import favorites_bp
     from app.routes.likes import likes_bp
-    from app.routes.tags import tags_bp
     from app.routes.history import history_bp
     from app.routes.douyin import douyin_bp
+    from app.routes.peak import peak_bp
+    from app.routes.wordcloud import wordcloud_bp
 
     app.register_blueprint(videos_bp)
     app.register_blueprint(images_bp)
     app.register_blueprint(sources_bp)
     app.register_blueprint(favorites_bp)
     app.register_blueprint(likes_bp)
-    app.register_blueprint(tags_bp)
     app.register_blueprint(history_bp)
     app.register_blueprint(douyin_bp)
+    app.register_blueprint(peak_bp)
+    app.register_blueprint(wordcloud_bp)
 
     @app.route('/api/health')
     def health_check():

@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app, db
-from app.models import Video, Image, WatchHistory, ThumbnailCache, Source
+from app.models import Video, Image, WatchHistory, ThumbnailCache, Source, ScanLog
 from sqlalchemy import inspect
 
 def migrate():
@@ -94,6 +94,34 @@ def migrate():
             print("✅ is_liked column added to images")
         else:
             print("✅ is_liked column exists in images")
+
+        # Add file_modified_at column to videos table
+        if 'file_modified_at' not in video_columns:
+            print("✨ Adding file_modified_at to videos table...")
+            with db.engine.connect() as conn:
+                conn.execute(db.text("ALTER TABLE videos ADD COLUMN file_modified_at DATETIME"))
+                conn.commit()
+            print("✅ file_modified_at column added to videos")
+        else:
+            print("✅ file_modified_at column exists in videos")
+
+        # Add file_modified_at column to images table
+        if 'file_modified_at' not in image_columns:
+            print("✨ Adding file_modified_at to images table...")
+            with db.engine.connect() as conn:
+                conn.execute(db.text("ALTER TABLE images ADD COLUMN file_modified_at DATETIME"))
+                conn.commit()
+            print("✅ file_modified_at column added to images")
+        else:
+            print("✅ file_modified_at column exists in images")
+
+        # Create scan_logs table
+        if 'scan_logs' not in existing_tables:
+            print("✨ Creating scan_logs table...")
+            db.create_all()
+            print("✅ scan_logs table created")
+        else:
+            print("✅ scan_logs table exists")
         
         print("\n✅ Migration completed successfully!")
         print("\n📋 Summary:")
@@ -101,6 +129,8 @@ def migrate():
         print("  - Video and image scanning is now separated by source media_type")
         print("  - Existing sources default to 'all' (backward compatible)")
         print("  - Added is_liked column to videos and images (likes feature)")
+        print("  - Added file_modified_at column to videos and images (incremental scan)")
+        print("  - Added scan_logs table for tracking scan operations")
 
 if __name__ == '__main__':
     migrate()

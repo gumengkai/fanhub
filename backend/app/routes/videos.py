@@ -1,7 +1,9 @@
 import os
+import subprocess
+import shutil
 from flask import Blueprint, request, jsonify, send_file, Response, current_app
 from sqlalchemy import desc, asc, func
-from ..models import db, Video, Tag, WatchHistory, Source
+from ..models import db, Video, WatchHistory, Source
 import io
 from PIL import Image as PILImage, ImageDraw, ImageFont
 
@@ -40,7 +42,6 @@ def get_videos():
     sort_by = request.args.get('sort_by', 'created_at')
     order = request.args.get('order', 'desc')
     source_id = request.args.get('source_id', type=int)
-    tag_id = request.args.get('tag_id', type=int)
     favorite = request.args.get('favorite')
     unwatched = request.args.get('unwatched')
     liked = request.args.get('liked')
@@ -62,13 +63,15 @@ def get_videos():
     query = Video.query.filter(Video.source_id.in_(non_douyin_source_ids))
 
     if search:
-        query = query.filter(Video.title.ilike(f'%{search}%'))
+        query = query.filter(
+            db.or_(
+                Video.title.ilike(f'%{search}%'),
+                Video.path.ilike(f'%{search}%')
+            )
+        )
 
     if source_id:
         query = query.filter(Video.source_id == source_id)
-
-    if tag_id:
-        query = query.join(Video.tags).filter(Tag.id == tag_id)
 
     if favorite is not None:
         # 处理 'true', '1', 1 等值为 True
@@ -85,21 +88,25 @@ def get_videos():
         if is_unwatched:
             query = query.outerjoin(WatchHistory).filter(WatchHistory.id == None)
 
-    if sort_by == 'view_count':
-        sort_column = Video.view_count
-    elif sort_by == 'duration':
-        sort_column = Video.duration
-    elif sort_by == 'file_size':
-        sort_column = Video.file_size
-    elif sort_by == 'title':
-        sort_column = Video.title
+    if sort_by == 'random':
+        # Random ordering - use database random function
+        query = query.order_by(func.random())
     else:
-        sort_column = Video.created_at
+        if sort_by == 'view_count':
+            sort_column = Video.view_count
+        elif sort_by == 'duration':
+            sort_column = Video.duration
+        elif sort_by == 'file_size':
+            sort_column = Video.file_size
+        elif sort_by == 'title':
+            sort_column = Video.title
+        else:
+            sort_column = Video.created_at
 
-    if order == 'desc':
-        query = query.order_by(desc(sort_column))
-    else:
-        query = query.order_by(asc(sort_column))
+        if order == 'desc':
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(asc(sort_column))
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -140,23 +147,287 @@ def update_video(video_id):
 
 @videos_bp.route('/<int:video_id>/stream', methods=['GET'])
 def stream_video(video_id):
-    """Stream video file with optimized range requests."""
+    """Stream video file. Only native formats are supported via streaming."""
     video = Video.query.get_or_404(video_id)
 
     if not os.path.exists(video.path):
         return jsonify({'error': 'Video file not found'}), 404
 
-    range_header = request.headers.get('Range', None)
-    file_size = os.path.getsize(video.path)
+    # 获取文件扩展名
+    ext = os.path.splitext(video.path)[1].lower()
+    
+    # 浏览器/ExoPlayer 原生支持的格式直接传输
+    native_formats = {'.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg', '.mkv', '.3gp'}
+    
+    if ext in native_formats:
+        # 原生支持格式，直接传输
+        range_header = request.headers.get('Range', None)
+        file_size = os.path.getsize(video.path)
 
+        if range_header:
+            byte_start, byte_end = range_header.replace('bytes=', '').split('-')
+            byte_start = int(byte_start) if byte_start else 0
+            byte_end = int(byte_end) if byte_end else file_size - 1
+            remaining = byte_end - byte_start + 1
+
+            def generate(remaining_bytes):
+                with open(video.path, 'rb') as f:
+                    f.seek(byte_start)
+                    while remaining_bytes > 0:
+                        chunk_size = min(65536, remaining_bytes)
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        remaining_bytes -= len(data)
+                        yield data
+
+            headers = {
+                'Content-Range': f'bytes {byte_start}-{byte_end}/{file_size}',
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(remaining),
+                'Content-Type': 'video/mp4',
+                'Cache-Control': 'public, max-age=3600'
+            }
+            return Response(generate(remaining), 206, headers)
+        else:
+            return send_file(
+                video.path,
+                mimetype='video/mp4',
+                as_attachment=False
+            )
+    else:
+        # 非原生格式（如 AVI），使用 FFmpeg 实时流式转码
+        return transcode_streaming(video.path)
+
+
+def get_transcoded_path(video_path):
+    """获取转码后的视频路径，如果不存在则进行转码。"""
+    # 创建转码缓存目录
+    cache_dir = '/app/storage/transcoded'
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    # 生成缓存文件名（基于原文件路径的 hash）
+    import hashlib
+    file_hash = hashlib.md5(video_path.encode()).hexdigest()
+    cache_path = os.path.join(cache_dir, f'{file_hash}.mp4')
+    
+    # 如果缓存文件已存在且比原文件新，直接返回
+    if os.path.exists(cache_path):
+        if os.path.getmtime(cache_path) >= os.path.getmtime(video_path):
+            return cache_path
+    
+    return None
+
+
+def transcode_video(video_path):
+    """使用 FFmpeg 转码视频为 MP4 格式（支持进度条）。"""
+    # 检查 FFmpeg 是否可用
+    if not shutil.which('ffmpeg'):
+        return jsonify({'error': 'FFmpeg not available for transcoding'}), 500
+    
+    try:
+        # 检查是否已有转码缓存
+        cache_path = get_transcoded_path(video_path)
+        if cache_path and os.path.exists(cache_path):
+            # 使用缓存文件，支持 range 请求
+            return serve_with_range(cache_path)
+        
+        # 创建转码缓存目录
+        cache_dir = '/app/storage/transcoded'
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # 生成缓存文件名
+        import hashlib
+        file_hash = hashlib.md5(video_path.encode()).hexdigest()
+        cache_path = os.path.join(cache_dir, f'{file_hash}.mp4')
+        
+        # 启动后台转码（异步）
+        cmd = [
+            'ffmpeg',
+            '-i', video_path,
+            '-c:v', 'libx264',
+            '-preset', 'fast',  # 平衡速度和质量
+            '-crf', '23',       # 质量设置
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',  # 支持流式传输
+            '-y',               # 覆盖输出文件
+            cache_path
+        ]
+        
+        # 启动转码进程（不等待完成）
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        
+        # 等待一小段时间让转码开始并生成文件头
+        import time
+        time.sleep(1)
+        
+        # 检查转码是否已经开始
+        if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+            # 等待文件足够大（至少 1MB 或转码完成）
+            max_wait = 30  # 最多等待 30 秒
+            waited = 0
+            while waited < max_wait:
+                size = os.path.getsize(cache_path)
+                # 检查转码是否完成（通过检查进程）
+                result = subprocess.run(['pgrep', '-f', f'ffmpeg.*{file_hash}'], capture_output=True)
+                if result.returncode != 0:  # 进程已结束
+                    break
+                if size > 1024 * 1024:  # 至少 1MB
+                    break
+                time.sleep(0.5)
+                waited += 0.5
+            
+            # 返回正在生成的文件（支持 range 请求）
+            return serve_with_range(cache_path)
+        else:
+            # 转码启动失败，回退到实时流式转码
+            return transcode_streaming(video_path)
+        
+    except Exception as e:
+        current_app.logger.error(f"Transcoding error: {e}")
+        return jsonify({'error': f'Transcoding failed: {str(e)}'}), 500
+
+
+def transcode_video_fast(video_path):
+    """使用 FFmpeg 快速转码视频为 MP4 格式（低质量但快速）。"""
+    # 检查 FFmpeg 是否可用
+    if not shutil.which('ffmpeg'):
+        return jsonify({'error': 'FFmpeg not available for transcoding'}), 500
+    
+    try:
+        # 检查是否已有转码缓存
+        cache_path = get_transcoded_path(video_path)
+        if cache_path and os.path.exists(cache_path):
+            # 使用缓存文件，支持 range 请求
+            return serve_with_range(cache_path)
+        
+        # 创建转码缓存目录
+        cache_dir = '/app/storage/transcoded'
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # 生成缓存文件名
+        import hashlib
+        file_hash = hashlib.md5(video_path.encode()).hexdigest()
+        cache_path = os.path.join(cache_dir, f'{file_hash}.mp4')
+        
+        # 启动快速转码（异步，使用更快的预设）
+        cmd = [
+            'ffmpeg',
+            '-i', video_path,
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',  # 最快预设
+            '-tune', 'fastdecode',   # 优化解码速度
+            '-crf', '28',            # 稍低质量但更快
+            '-c:a', 'aac',
+            '-b:a', '96k',           # 稍低音频质量
+            '-movflags', '+faststart',  # 支持流式传输
+            '-y',               # 覆盖输出文件
+            cache_path
+        ]
+        
+        # 启动转码进程（不等待完成）
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        
+        # 等待一小段时间让转码开始并生成文件头
+        import time
+        time.sleep(0.5)
+        
+        # 检查转码是否已经开始
+        if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+            # 等待文件足够大（至少 512KB 或转码完成）
+            max_wait = 15  # 最多等待 15 秒
+            waited = 0
+            while waited < max_wait:
+                size = os.path.getsize(cache_path)
+                # 检查转码是否完成（通过检查进程）
+                result = subprocess.run(['pgrep', '-f', f'ffmpeg.*{file_hash}'], capture_output=True)
+                if result.returncode != 0:  # 进程已结束
+                    break
+                if size > 512 * 1024:  # 至少 512KB
+                    break
+                time.sleep(0.3)
+                waited += 0.3
+            
+            # 返回正在生成的文件（支持 range 请求）
+            return serve_with_range(cache_path)
+        else:
+            # 转码启动失败，回退到实时流式转码
+            return transcode_streaming(video_path)
+        
+    except Exception as e:
+        current_app.logger.error(f"Transcoding error: {e}")
+        return jsonify({'error': f'Transcoding failed: {str(e)}'}), 500
+
+
+def transcode_streaming(video_path):
+    """实时流式转码（作为后备方案）。"""
+    try:
+        cmd = [
+            'ffmpeg',
+            '-i', video_path,
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-tune', 'zerolatency',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', 'frag_keyframe+empty_moov+faststart',
+            '-f', 'mp4',
+            'pipe:1'
+        ]
+        
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=8192
+        )
+        
+        def generate():
+            try:
+                while True:
+                    chunk = process.stdout.read(65536)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                process.terminate()
+                process.wait()
+        
+        return Response(
+            generate(),
+            mimetype='video/mp4',
+            headers={
+                'Content-Type': 'video/mp4',
+                'Cache-Control': 'no-cache',
+                'X-Transcoded': 'streaming'
+            }
+        )
+    except Exception as e:
+        return jsonify({'error': f'Streaming failed: {str(e)}'}), 500
+
+
+def serve_with_range(file_path):
+    """支持 HTTP Range 请求的文件传输。"""
+    range_header = request.headers.get('Range', None)
+    file_size = os.path.getsize(file_path)
+    
     if range_header:
         byte_start, byte_end = range_header.replace('bytes=', '').split('-')
         byte_start = int(byte_start) if byte_start else 0
         byte_end = int(byte_end) if byte_end else file_size - 1
         remaining = byte_end - byte_start + 1
-
+        
         def generate(remaining_bytes):
-            with open(video.path, 'rb') as f:
+            with open(file_path, 'rb') as f:
                 f.seek(byte_start)
                 while remaining_bytes > 0:
                     chunk_size = min(65536, remaining_bytes)
@@ -165,7 +436,7 @@ def stream_video(video_id):
                         break
                     remaining_bytes -= len(data)
                     yield data
-
+        
         headers = {
             'Content-Range': f'bytes {byte_start}-{byte_end}/{file_size}',
             'Accept-Ranges': 'bytes',
@@ -176,7 +447,7 @@ def stream_video(video_id):
         return Response(generate(remaining), 206, headers)
     else:
         return send_file(
-            video.path,
+            file_path,
             mimetype='video/mp4',
             as_attachment=False
         )
@@ -346,64 +617,6 @@ def batch_generate_thumbnails():
     
     results = generate_batch_thumbnails(items, 'video', progress_callback)
     return jsonify(results)
-
-
-@videos_bp.route('/<int:video_id>/tags', methods=['GET'])
-def get_video_tags(video_id):
-    """Get all tags for a video."""
-    video = Video.query.get_or_404(video_id)
-    return jsonify([tag.to_dict() for tag in video.tags])
-
-
-@videos_bp.route('/<int:video_id>/tags', methods=['POST'])
-def add_tag_to_video(video_id):
-    """Add a tag to video."""
-    video = Video.query.get_or_404(video_id)
-    data = request.get_json()
-    tag_id = data.get('tag_id')
-
-    if not tag_id:
-        return jsonify({'error': 'tag_id is required'}), 400
-
-    tag = Tag.query.get_or_404(tag_id)
-
-    if tag not in video.tags:
-        video.tags.append(tag)
-        db.session.commit()
-
-    return jsonify([t.to_dict() for t in video.tags])
-
-
-@videos_bp.route('/<int:video_id>/tags/<int:tag_id>', methods=['DELETE'])
-def remove_tag_from_video(video_id, tag_id):
-    """Remove a tag from video."""
-    video = Video.query.get_or_404(video_id)
-    tag = Tag.query.get_or_404(tag_id)
-
-    if tag in video.tags:
-        video.tags.remove(tag)
-        db.session.commit()
-
-    return jsonify([t.to_dict() for t in video.tags])
-
-
-@videos_bp.route('/<int:video_id>/related', methods=['GET'])
-def get_related_videos(video_id):
-    """Get related videos based on tags."""
-    video = Video.query.get_or_404(video_id)
-    limit = request.args.get('limit', 6, type=int)
-
-    if not video.tags:
-        related = Video.query.filter(Video.id != video_id).order_by(desc(Video.created_at)).limit(limit).all()
-        return jsonify([v.to_dict() for v in related])
-
-    tag_ids = [tag.id for tag in video.tags]
-    related = Video.query.join(Video.tags).filter(
-        Tag.id.in_(tag_ids),
-        Video.id != video_id
-    ).group_by(Video.id).order_by(desc(func.count(Tag.id))).limit(limit).all()
-
-    return jsonify([v.to_dict() for v in related])
 
 
 @videos_bp.route('/<int:video_id>/history', methods=['GET'])

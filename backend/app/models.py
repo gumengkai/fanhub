@@ -3,12 +3,6 @@
 from datetime import datetime
 from app import db
 
-# Association table for video tags
-video_tags = db.Table('video_tags',
-    db.Column('video_id', db.Integer, db.ForeignKey('videos.id'), primary_key=True),
-    db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
-)
-
 
 class Source(db.Model):
     """Media source configuration model"""
@@ -48,30 +42,6 @@ class Source(db.Model):
         return f'<Source {self.name} ({self.type}, {self.media_type})>'
 
 
-class Tag(db.Model):
-    """Tag model for categorizing videos"""
-    __tablename__ = 'tags'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64), nullable=False, unique=True)
-    color = db.Column(db.String(7), default='#fb7299')  # Bilibili pink
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    videos = db.relationship('Video', secondary=video_tags, back_populates='tags')
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'color': self.color,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'video_count': len(self.videos)
-        }
-
-    def __repr__(self):
-        return f'<Tag {self.name}>'
-
-
 class Video(db.Model):
     """Video media model"""
     __tablename__ = 'videos'
@@ -91,11 +61,16 @@ class Video(db.Model):
     view_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    file_modified_at = db.Column(db.DateTime, nullable=True)  # 文件实际修改时间，用于增量扫描
 
-    tags = db.relationship('Tag', secondary=video_tags, back_populates='videos')
     watch_history = db.relationship('WatchHistory', backref='video', lazy='dynamic', cascade='all, delete-orphan')
 
     def to_dict(self, include_details=False):
+        import os
+        ext = os.path.splitext(self.path)[1].lower()
+        # ExoPlayer 原生支持的格式
+        native_formats = {'.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg', '.mkv', '.3gp'}
+        
         data = {
             'id': self.id,
             'title': self.title,
@@ -110,9 +85,11 @@ class Video(db.Model):
             'is_liked': self.is_liked,
             'description': self.description,
             'view_count': self.view_count,
-            'tags': [tag.to_dict() for tag in self.tags] if self.tags else [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'file_modified_at': self.file_modified_at.isoformat() if self.file_modified_at else None,
+            'format': ext,
+            'requires_external_player': ext not in native_formats
         }
         if include_details:
             data['source'] = self.source.to_dict() if self.source else None
@@ -138,6 +115,7 @@ class Image(db.Model):
     is_liked = db.Column(db.Boolean, default=False)
     view_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    file_modified_at = db.Column(db.DateTime, nullable=True)  # 文件实际修改时间，用于增量扫描
 
     def to_dict(self, include_details=False):
         data = {
@@ -152,7 +130,8 @@ class Image(db.Model):
             'is_favorite': self.is_favorite,
             'is_liked': self.is_liked,
             'view_count': self.view_count,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'file_modified_at': self.file_modified_at.isoformat() if self.file_modified_at else None
         }
         if include_details:
             data['source'] = self.source.to_dict() if self.source else None
@@ -217,3 +196,99 @@ class ThumbnailCache(db.Model):
 
     def __repr__(self):
         return f'<ThumbnailCache {self.media_type}_{self.media_id}>'
+
+
+class WordCloudCache(db.Model):
+    """WordCloud cache for storing generated wordcloud data"""
+    __tablename__ = 'wordcloud_cache'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cache_key = db.Column(db.String(64), nullable=False, unique=True)
+    data = db.Column(db.JSON, nullable=False, default=list)
+    version = db.Column(db.Integer, default=1)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'cache_key': self.cache_key,
+            'data': self.data,
+            'version': self.version,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @staticmethod
+    def get_global_version():
+        """Get or create global cache version"""
+        version_record = WordCloudCache.query.filter_by(cache_key='__global_version__').first()
+        if not version_record:
+            version_record = WordCloudCache(
+                cache_key='__global_version__',
+                data=[],
+                version=1
+            )
+            db.session.add(version_record)
+            db.session.commit()
+        return version_record.version
+
+    @staticmethod
+    def increment_global_version():
+        """Increment global cache version to invalidate all caches"""
+        version_record = WordCloudCache.query.filter_by(cache_key='__global_version__').first()
+        if version_record:
+            version_record.version += 1
+        else:
+            version_record = WordCloudCache(
+                cache_key='__global_version__',
+                data=[],
+                version=1
+            )
+            db.session.add(version_record)
+        db.session.commit()
+        return version_record.version
+
+    def __repr__(self):
+        return f'<WordCloudCache {self.cache_key} v{self.version}>'
+
+
+class ScanLog(db.Model):
+    """Scan log for tracking source scanning operations"""
+    __tablename__ = 'scan_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_id = db.Column(db.Integer, db.ForeignKey('sources.id'), nullable=False)
+    source_name = db.Column(db.String(128), nullable=False)
+    status = db.Column(db.String(16), nullable=False, default='running')  # 'running', 'completed', 'failed'
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    videos_added = db.Column(db.Integer, default=0)
+    videos_updated = db.Column(db.Integer, default=0)
+    videos_removed = db.Column(db.Integer, default=0)
+    images_added = db.Column(db.Integer, default=0)
+    images_updated = db.Column(db.Integer, default=0)
+    images_removed = db.Column(db.Integer, default=0)
+    errors = db.Column(db.JSON, default=list)  # 错误信息列表
+    details = db.Column(db.JSON, default=list)  # 详细操作记录 [{type: 'added|removed|updated', path: '...', media_type: 'video|image'}]
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'source_id': self.source_id,
+            'source_name': self.source_name,
+            'status': self.status,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'videos_added': self.videos_added,
+            'videos_updated': self.videos_updated,
+            'videos_removed': self.videos_removed,
+            'images_added': self.images_added,
+            'images_updated': self.images_updated,
+            'images_removed': self.images_removed,
+            'errors': self.errors or [],
+            'details': self.details or []
+        }
+
+    def __repr__(self):
+        return f'<ScanLog {self.source_name} {self.status}>'

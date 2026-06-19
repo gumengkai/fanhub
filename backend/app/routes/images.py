@@ -1,6 +1,6 @@
 import os
 from flask import Blueprint, request, jsonify, send_file
-from sqlalchemy import desc, asc
+from sqlalchemy import desc, asc, func
 from ..models import db, Image
 from ..services.thumbnail import generate_image_thumbnail
 
@@ -22,7 +22,12 @@ def get_images():
     query = Image.query
 
     if search:
-        query = query.filter(Image.title.ilike(f'%{search}%'))
+        query = query.filter(
+            db.or_(
+                Image.title.ilike(f'%{search}%'),
+                Image.path.ilike(f'%{search}%')
+            )
+        )
 
     if source_id:
         query = query.filter(Image.source_id == source_id)
@@ -37,11 +42,15 @@ def get_images():
         query = query.filter(Image.is_liked == is_liked_val)
 
     # Sorting
-    sort_column = getattr(Image, sort_by, Image.created_at)
-    if order == 'desc':
-        query = query.order_by(desc(sort_column))
+    if sort_by == 'random':
+        # Random ordering - use database random function
+        query = query.order_by(func.random())
     else:
-        query = query.order_by(asc(sort_column))
+        sort_column = getattr(Image, sort_by, Image.created_at)
+        if order == 'desc':
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(asc(sort_column))
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -239,7 +248,12 @@ def get_all_images():
     query = Image.query
 
     if search:
-        query = query.filter(Image.title.ilike(f'%{search}%'))
+        query = query.filter(
+            db.or_(
+                Image.title.ilike(f'%{search}%'),
+                Image.path.ilike(f'%{search}%')
+            )
+        )
 
     if source_id:
         query = query.filter(Image.source_id == source_id)

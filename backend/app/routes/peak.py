@@ -1,4 +1,4 @@
-"""Douyin Library API Routes"""
+"""Peak Library API Routes"""
 
 import os
 import subprocess
@@ -9,12 +9,12 @@ from ..models import db, Video, Source
 import io
 from PIL import Image as PILImage, ImageDraw, ImageFont
 
-douyin_bp = Blueprint('douyin', __name__, url_prefix='/api/douyin')
+peak_bp = Blueprint('peak', __name__, url_prefix='/api/peak')
 
 
-def get_douyin_source_ids():
-    """Get all source IDs with media_type='douyin'"""
-    sources = Source.query.filter_by(media_type='douyin', is_active=True).all()
+def get_peak_source_ids():
+    """Get all source IDs with media_type='peak'"""
+    sources = Source.query.filter_by(media_type='peak', is_active=True).all()
     return [s.id for s in sources]
 
 
@@ -23,7 +23,7 @@ def generate_placeholder(text="No Video", color=(51, 51, 51), text_color=(255, 2
     img = PILImage.new('RGB', (320, 180), color=color)
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
+        font = PILImage.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
     except:
         font = PILImage.load_default()
 
@@ -40,20 +40,20 @@ def generate_placeholder(text="No Video", color=(51, 51, 51), text_color=(255, 2
     return img_io
 
 
-@douyin_bp.route('', methods=['GET'])
-def get_douyin_videos():
-    """Get douyin library video list with pagination and filters."""
+@peak_bp.route('', methods=['GET'])
+def get_peak_videos():
+    """Get peak library video list with pagination and filters."""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     search = request.args.get('search', '')
-    sort_by = request.args.get('sort_by', 'created_at')
+    sort_by = request.args.get('sort_by', 'random')
     order = request.args.get('order', 'desc')
     favorite = request.args.get('favorite')
     liked = request.args.get('liked')
     unwatched = request.args.get('unwatched')
 
-    # Get douyin source IDs
-    source_ids = get_douyin_source_ids()
+    # Get peak source IDs
+    source_ids = get_peak_source_ids()
     if not source_ids:
         return jsonify({
             'items': [],
@@ -118,20 +118,20 @@ def get_douyin_videos():
     })
 
 
-@douyin_bp.route('/<int:video_id>', methods=['GET'])
-def get_douyin_video(video_id):
-    """Get douyin video details."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>', methods=['GET'])
+def get_peak_video(video_id):
+    """Get peak video details."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
     video.view_count += 1
     db.session.commit()
     return jsonify(video.to_dict(include_details=True))
 
 
-@douyin_bp.route('/<int:video_id>/stream', methods=['GET'])
-def stream_douyin_video(video_id):
-    """Stream douyin video file with real-time transcoding for non-native formats."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>/stream', methods=['GET'])
+def stream_peak_video(video_id):
+    """Stream peak video file with real-time transcoding for non-native formats."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
 
     if not os.path.exists(video.path):
@@ -181,7 +181,7 @@ def stream_douyin_video(video_id):
             )
     else:
         # 非原生格式，使用 FFmpeg 实时转码为 MP4
-        return transcode_video_douyin(video.path)
+        return transcode_video_peak(video.path)
 
 
 def get_transcoded_path(video_path):
@@ -200,15 +200,15 @@ def get_transcoded_path(video_path):
     return None
 
 
-def transcode_video_douyin(video_path):
-    """使用 FFmpeg 转码视频为 MP4 格式（抖音库）- 快速模式。"""
+def transcode_video_peak(video_path):
+    """使用 FFmpeg 转码视频为 MP4 格式（Peak库）- 快速模式。"""
     if not shutil.which('ffmpeg'):
         return jsonify({'error': 'FFmpeg not available for transcoding'}), 500
     
     try:
         cache_path = get_transcoded_path(video_path)
         if cache_path and os.path.exists(cache_path):
-            return serve_with_range_douyin(cache_path)
+            return serve_with_range_peak(cache_path)
         
         cache_dir = '/app/storage/transcoded'
         os.makedirs(cache_dir, exist_ok=True)
@@ -250,16 +250,16 @@ def transcode_video_douyin(video_path):
                 time.sleep(0.3)
                 waited += 0.3
             
-            return serve_with_range_douyin(cache_path)
+            return serve_with_range_peak(cache_path)
         else:
-            return transcode_streaming_douyin(video_path)
+            return transcode_streaming_peak(video_path)
         
     except Exception as e:
         current_app.logger.error(f"Transcoding error: {e}")
         return jsonify({'error': f'Transcoding failed: {str(e)}'}), 500
 
 
-def transcode_streaming_douyin(video_path):
+def transcode_streaming_peak(video_path):
     """实时流式转码（后备方案）。"""
     try:
         cmd = [
@@ -297,7 +297,7 @@ def transcode_streaming_douyin(video_path):
         return jsonify({'error': f'Streaming failed: {str(e)}'}), 500
 
 
-def serve_with_range_douyin(file_path):
+def serve_with_range_peak(file_path):
     """支持 Range 请求。"""
     range_header = request.headers.get('Range', None)
     file_size = os.path.getsize(file_path)
@@ -331,10 +331,10 @@ def serve_with_range_douyin(file_path):
         return send_file(file_path, mimetype='video/mp4', as_attachment=False)
 
 
-@douyin_bp.route('/<int:video_id>/thumbnail', methods=['GET'])
-def get_douyin_thumbnail(video_id):
-    """Get douyin video thumbnail."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>/thumbnail', methods=['GET'])
+def get_peak_thumbnail(video_id):
+    """Get peak video thumbnail."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
 
     if video.thumbnail_path and os.path.exists(video.thumbnail_path):
@@ -365,17 +365,17 @@ def get_douyin_thumbnail(video_id):
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
     except Exception as e:
-        current_app.logger.error(f"Thumbnail error for douyin video {video_id}: {e}")
+        current_app.logger.error(f"Thumbnail error for peak video {video_id}: {e}")
         img_io = generate_placeholder("Click to Play", (30, 30, 50), (254, 44, 85))
         response = send_file(img_io, mimetype='image/jpeg')
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
 
 
-@douyin_bp.route('/<int:video_id>', methods=['DELETE'])
-def delete_douyin_video(video_id):
-    """Delete douyin video record and file."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>', methods=['DELETE'])
+def delete_peak_video(video_id):
+    """Delete peak video record and file."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
 
     if video.thumbnail_path and os.path.exists(video.thumbnail_path):
@@ -392,13 +392,13 @@ def delete_douyin_video(video_id):
 
     db.session.delete(video)
     db.session.commit()
-    return jsonify({'message': 'Douyin video deleted successfully'})
+    return jsonify({'message': 'Peak video deleted successfully'})
 
 
-@douyin_bp.route('/<int:video_id>/like', methods=['POST'])
-def toggle_douyin_like(video_id):
-    """Toggle like status for douyin video."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>/like', methods=['POST'])
+def toggle_peak_like(video_id):
+    """Toggle like status for peak video."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
     video.is_liked = not video.is_liked
     db.session.commit()
@@ -408,10 +408,10 @@ def toggle_douyin_like(video_id):
     })
 
 
-@douyin_bp.route('/<int:video_id>/favorite', methods=['POST'])
-def toggle_douyin_favorite(video_id):
-    """Toggle favorite status for douyin video."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>/favorite', methods=['POST'])
+def toggle_peak_favorite(video_id):
+    """Toggle favorite status for peak video."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
     video.is_favorite = not video.is_favorite
     db.session.commit()
@@ -421,10 +421,10 @@ def toggle_douyin_favorite(video_id):
     })
 
 
-@douyin_bp.route('/stats', methods=['GET'])
-def get_douyin_stats():
-    """Get douyin library statistics."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/stats', methods=['GET'])
+def get_peak_stats():
+    """Get peak library statistics."""
+    source_ids = get_peak_source_ids()
     if not source_ids:
         return jsonify({
             'total': 0,
@@ -453,10 +453,10 @@ def get_douyin_stats():
     })
 
 
-@douyin_bp.route('/<int:video_id>/history', methods=['POST', 'PUT'])
-def update_douyin_history(video_id):
-    """Update watch progress for douyin video."""
-    source_ids = get_douyin_source_ids()
+@peak_bp.route('/<int:video_id>/history', methods=['POST', 'PUT'])
+def update_peak_history(video_id):
+    """Update watch progress for peak video."""
+    source_ids = get_peak_source_ids()
     video = Video.query.filter(Video.id == video_id, Video.source_id.in_(source_ids)).first_or_404()
     data = request.get_json()
     playback_position = data.get('playback_position', 0)
