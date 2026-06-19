@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Typography,
@@ -9,12 +9,10 @@ import {
   message,
   Modal,
   Image,
-  Switch,
   Checkbox,
 } from 'antd'
 import {
   DeleteOutlined,
-  EyeOutlined,
   PlayCircleOutlined,
   HeartFilled,
   StarFilled,
@@ -38,13 +36,14 @@ function ImageLibrary() {
   const [loading, setLoading] = useState(false)
 
   // 从 URL 参数恢复状态
-  const [pagination, setPagination] = useState({
-    current: parseInt(searchParams.get('page') || '1', 10),
-    pageSize: parseInt(searchParams.get('pageSize') || '24', 10),
-    total: 0,
-  })
-  const [sortBy, setSortBy] = useState(searchParams.get('sort')?.split('_')[0] || 'created_at')
-  const [sortOrder, setSortOrder] = useState(searchParams.get('sort')?.split('_')[1] || 'desc')
+  const urlSort = searchParams.get('sort') || 'random_desc'
+  const urlSortParts = urlSort.split('_')
+
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1', 10))
+  const [pageSize, setPageSize] = useState(parseInt(searchParams.get('pageSize') || '24', 10))
+  const [total, setTotal] = useState(0)
+  const [sortBy, setSortBy] = useState(urlSortParts[0] || 'random')
+  const [sortOrder, setSortOrder] = useState(urlSortParts[1] || 'desc')
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [previewImage, setPreviewImage] = useState(null)
   const [previewVisible, setPreviewVisible] = useState(false)
@@ -55,55 +54,59 @@ function ImageLibrary() {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
 
-  // 更新 URL 参数的辅助函数
-  const updateUrlParams = useCallback((updates = {}) => {
-    const params = {}
-    const page = updates.page ?? pagination.current
-    const pageSize = updates.pageSize ?? pagination.pageSize
-    const sort = updates.sort ?? `${sortBy}_${sortOrder}`
-    const search = updates.search ?? searchQuery
-    const filter = updates.filter ?? filterType
+  // 使用 ref 存储最新的请求参数，避免闭包问题
+  const latestParams = useRef({
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+    searchQuery,
+    filterType
+  })
 
-    // 只添加非默认值的参数
-    if (page > 1) params.page = page.toString()
-    if (pageSize !== 24) params.pageSize = pageSize.toString()
-    if (sort !== 'created_at_desc') params.sort = sort
-    if (search) params.search = search
-    if (filter !== 'all') params.filter = filter
+  // 同步 ref 与 state
+  useEffect(() => {
+    latestParams.current = {
+      currentPage,
+      pageSize,
+      sortBy,
+      sortOrder,
+      searchQuery,
+      filterType
+    }
+  }, [currentPage, pageSize, sortBy, sortOrder, searchQuery, filterType])
 
-    setSearchParams(params, { replace: true })
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, filterType, setSearchParams])
-
+  // 获取图片列表 - 使用 ref 中的最新值
   const fetchImages = useCallback(async () => {
+    const params = latestParams.current
     setLoading(true)
     try {
-      const params = {
-        page: pagination.current,
-        per_page: pagination.pageSize,
-        sort_by: sortBy,
-        order: sortOrder,
-        search: searchQuery || searchParams.get('search') || '',
+      const apiParams = {
+        page: params.currentPage,
+        per_page: params.pageSize,
+        sort_by: params.sortBy,
+        order: params.sortOrder,
+        search: params.searchQuery,
       }
-      if (filterType === 'liked') {
-        params.liked = true
-      } else if (filterType === 'favorite') {
-        params.favorite = true
+      if (params.filterType === 'liked') {
+        apiParams.liked = true
+      } else if (params.filterType === 'favorite') {
+        apiParams.favorite = true
       }
 
-      const response = await imagesApi.getList(params)
+      console.log('Fetching images with params:', apiParams)
+
+      const response = await imagesApi.getList(apiParams)
 
       setImages(response.items || [])
-      setPagination(prev => ({
-        ...prev,
-        total: response.total || 0,
-      }))
+      setTotal(response.total || 0)
     } catch (error) {
       message.error('获取图片列表失败')
       console.error(error)
     } finally {
       setLoading(false)
     }
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, filterType])
+  }, []) // 空依赖数组，使用 ref 获取最新值
 
   const fetchAllImages = useCallback(async () => {
     try {
@@ -120,43 +123,66 @@ function ImageLibrary() {
     }
   }, [filterType])
 
+  // 当依赖项变化时重新获取数据
   useEffect(() => {
     fetchImages()
-  }, [fetchImages])
+  }, [currentPage, pageSize, sortBy, sortOrder, searchQuery, filterType, fetchImages])
 
   useEffect(() => {
     if (slideshowVisible && allImages.length === 0) {
       fetchAllImages()
     }
-  }, [slideshowVisible])
+  }, [slideshowVisible, allImages.length, fetchAllImages])
 
-  // Clear selection when leaving select mode
   useEffect(() => {
     if (!selectMode) {
       setSelectedIds([])
     }
   }, [selectMode])
 
-  const handlePageChange = (page, pageSize) => {
-    setPagination(prev => ({
-      ...prev,
-      current: page,
-      pageSize: pageSize,
-    }))
-    updateUrlParams({ page, pageSize })
+  // 更新 URL 参数
+  const updateUrlParams = useCallback((updates) => {
+    const params = {}
+    const currentParams = latestParams.current
+    const page = updates.page ?? currentParams.currentPage
+    const size = updates.pageSize ?? currentParams.pageSize
+    const sort = updates.sort ?? `${currentParams.sortBy}_${currentParams.sortOrder}`
+    const search = updates.search ?? currentParams.searchQuery
+    const filter = updates.filter ?? currentParams.filterType
+
+    if (page > 1) params.page = page.toString()
+    if (size !== 24) params.pageSize = size.toString()
+    if (sort !== 'random_desc') params.sort = sort
+    if (search) params.search = search
+    if (filter !== 'all') params.filter = filter
+
+    setSearchParams(params, { replace: true })
+  }, [setSearchParams])
+
+  const handlePageChange = (page, newPageSize) => {
+    setCurrentPage(page)
+    setPageSize(newPageSize)
+    updateUrlParams({ page, pageSize: newPageSize })
   }
 
   const handleSortChange = (value) => {
-    const [field, order] = value.split('_')
+    console.log('Sort changed to:', value)
+    // 正确拆分：最后一个 _ 后面是 order，前面的是 field
+    const lastUnderscoreIndex = value.lastIndexOf('_')
+    const field = value.slice(0, lastUnderscoreIndex)
+    const order = value.slice(lastUnderscoreIndex + 1)
+    console.log('Parsed field:', field, 'order:', order)
     setSortBy(field)
     setSortOrder(order)
-    setPagination(prev => ({ ...prev, current: 1 }))
+    setCurrentPage(1)
     updateUrlParams({ sort: value, page: 1 })
+    // 立即触发重新获取，不等待 useEffect
+    setTimeout(() => fetchImages(), 0)
   }
 
   const handleSearch = (value) => {
     setSearchQuery(value)
-    setPagination(prev => ({ ...prev, current: 1 }))
+    setCurrentPage(1)
     updateUrlParams({ search: value, page: 1 })
   }
 
@@ -164,12 +190,10 @@ function ImageLibrary() {
     try {
       await imagesApi.toggleFavorite(image.id)
       message.success(image.is_favorite ? '已取消收藏' : '已添加到收藏')
-      // 只更新当前图片的收藏状态，不刷新整个列表
       const newImages = images.map(img =>
         img.id === image.id ? { ...img, is_favorite: !img.is_favorite } : img
       )
       setImages(newImages)
-      // 同步更新 allImages
       setAllImages(prev => prev.length > 0
         ? prev.map(img => img.id === image.id ? { ...img, is_favorite: !img.is_favorite } : img)
         : []
@@ -183,12 +207,10 @@ function ImageLibrary() {
     try {
       await imagesApi.toggleLike(image.id)
       message.success(image.is_liked ? '已取消喜欢' : '已添加到喜欢')
-      // 只更新当前图片的喜欢状态，不刷新整个列表
       const newImages = images.map(img =>
         img.id === image.id ? { ...img, is_liked: !img.is_liked } : img
       )
       setImages(newImages)
-      // 同步更新 allImages
       setAllImages(prev => prev.length > 0
         ? prev.map(img => img.id === image.id ? { ...img, is_liked: !img.is_liked } : img)
         : []
@@ -282,6 +304,7 @@ function ImageLibrary() {
   }
 
   const sortOptions = [
+    { value: 'random_desc', label: '随机排序' },
     { value: 'created_at_desc', label: '最新添加' },
     { value: 'created_at_asc', label: '最早添加' },
     { value: 'title_asc', label: '名称 (A-Z)' },
@@ -299,7 +322,8 @@ function ImageLibrary() {
           <Search
             placeholder="搜索图片..."
             allowClear
-            defaultValue={searchParams.get('search') || ''}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             onSearch={handleSearch}
             style={{ width: 300 }}
           />
@@ -318,11 +342,10 @@ function ImageLibrary() {
             value={filterType}
             onChange={(value) => {
               setFilterType(value)
-              setPagination(prev => ({ ...prev, current: 1 }))
+              setCurrentPage(1)
               updateUrlParams({ filter: value, page: 1 })
             }}
             style={{ width: 120 }}
-            placeholder={<><FilterOutlined /> 筛选</>}
           >
             <Option value="all">全部图片</Option>
             <Option value="liked">
@@ -342,7 +365,6 @@ function ImageLibrary() {
             幻灯片播放 ({images.length > 0 ? images.length : '...'})
           </Button>
 
-          {/* Batch Operations */}
           {!selectMode ? (
             <Button
               icon={<CheckSquareOutlined />}
@@ -376,7 +398,6 @@ function ImageLibrary() {
           )}
         </Space>
 
-        {/* Selection Status Bar */}
         {selectMode && (
           <div style={{
             padding: '12px 16px',
@@ -405,9 +426,9 @@ function ImageLibrary() {
         type="image"
         loading={loading}
         pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
+          current: currentPage,
+          pageSize: pageSize,
+          total: total,
           onChange: handlePageChange,
         }}
         onFavorite={handleFavorite}

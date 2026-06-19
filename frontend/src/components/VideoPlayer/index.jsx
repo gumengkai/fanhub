@@ -40,12 +40,9 @@ function VideoPlayer({ video, onProgressUpdate }) {
   const savedPositionRef = useRef(0)
   const [error, setError] = useState(null)
 
-  // Check if video format is supported
+  // 所有格式都通过后端转码支持，无需前端检查
   const isFormatSupported = (filename) => {
-    if (!filename) return false
-    const ext = filename.split('.').pop().toLowerCase()
-    const supportedFormats = ['mp4', 'webm', 'ogv', 'ogg', 'mov', 'm4v']
-    return supportedFormats.includes(ext)
+    return true  // 后端会自动转码为 MP4
   }
 
   // Load saved progress
@@ -54,13 +51,6 @@ function VideoPlayer({ video, onProgressUpdate }) {
       // Reset saved position and error when video changes
       savedPositionRef.current = 0
       setError(null)
-
-      // Check format support
-      if (!isFormatSupported(video.path)) {
-        setError(`不支持的格式: ${video.path?.split('.').pop()?.toUpperCase() || '未知'}`)
-        setLoading(false)
-        return
-      }
 
       fetch(`/api/videos/${video.id}/history`)
         .then(res => res.json())
@@ -265,10 +255,7 @@ function VideoPlayer({ video, onProgressUpdate }) {
         <div className="video-error-overlay">
           <div className="error-icon">⚠️</div>
           <div className="error-title">无法播放此视频</div>
-          <div className="error-message">{error}</div>
-          <div className="error-message" style={{fontSize: '12px', marginTop: '8px'}}>
-            支持的格式: MP4, WebM, MOV, OGV, M4V
-          </div>
+          <div className="error-message">{error.message || '视频加载失败'}</div>
           <a
             href={`/api/videos/${video?.id}/stream`}
             download={video?.title}

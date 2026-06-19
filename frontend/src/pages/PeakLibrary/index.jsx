@@ -5,7 +5,7 @@ import {
   HeartOutlined, HeartFilled, StarOutlined, StarFilled, DeleteOutlined,
   PlayCircleOutlined, LeftOutlined, SoundOutlined, MutedOutlined,
 } from '@ant-design/icons'
-import { douyinApi } from '@services/api'
+import { peakApi } from '@services/api'
 import './index.css'
 
 // Custom Shuffle icon
@@ -17,10 +17,10 @@ const ShuffleIcon = ({ style }) => (
 
 const isMobile = () => window.innerWidth <= 768 || 'ontouchstart' in window
 
-const DouyinRed = '#FE2C55'
-const DouyinGold = '#FFD700'
+const PeakRed = '#FE2C55'
+const PeakGold = '#FFD700'
 
-function DouyinLibrary() {
+function PeakLibrary() {
   const navigate = useNavigate()
   const [allVideos, setAllVideos] = useState([])
   const [playlist, setPlaylist] = useState([])
@@ -36,8 +36,6 @@ function DouyinLibrary() {
   const [duration, setDuration] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [isMobileView, setIsMobileView] = useState(false)
-  const [tags, setTags] = useState([])
-  const [selectedTag, setSelectedTag] = useState(null)
   const [isProgressVisible, setIsProgressVisible] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
 
@@ -63,14 +61,14 @@ function DouyinLibrary() {
 
   const fetchAllVideos = async () => {
     try {
-      const response = await douyinApi.getList({ per_page: 1000, sort_by: 'random' })
+      const response = await peakApi.getList({ per_page: 1000, sort_by: 'random' })
       const videos = response.items || []
       setAllVideos(videos)
       // 如果随机模式开启，打乱播放列表
       const shuffledVideos = isRandom ? [...videos].sort(() => Math.random() - 0.5) : videos
       setPlaylist(shuffledVideos)
     } catch (error) {
-      message.error('获取抖音库视频失败')
+      message.error('获取巅峰库视频失败')
     }
   }
 
@@ -205,7 +203,7 @@ function DouyinLibrary() {
   const toggleLike = async () => {
     if (!currentVideo) return
     try {
-      await douyinApi.toggleLike(currentVideo.id)
+      await peakApi.toggleLike(currentVideo.id)
       currentVideo.is_liked = !currentVideo.is_liked
       setPlaylist([...playlist])
       message.success(currentVideo.is_liked ? '已喜欢' : '已取消喜欢', 0.5)
@@ -215,7 +213,7 @@ function DouyinLibrary() {
   const toggleFavorite = async () => {
     if (!currentVideo) return
     try {
-      await douyinApi.toggleFavorite(currentVideo.id)
+      await peakApi.toggleFavorite(currentVideo.id)
       currentVideo.is_favorite = !currentVideo.is_favorite
       setPlaylist([...playlist])
       message.success(currentVideo.is_favorite ? '已收藏' : '已取消收藏', 0.5)
@@ -232,7 +230,7 @@ function DouyinLibrary() {
       okType: 'danger',
       onOk: async () => {
         try {
-          await douyinApi.delete(currentVideo.id)
+          await peakApi.delete(currentVideo.id)
           await fetchAllVideos()
           message.success('视频已删除')
         } catch (error) { message.error('删除失败') }
@@ -360,11 +358,11 @@ function DouyinLibrary() {
 
   if (playlist.length === 0) {
     return (
-      <div className="douyin-page">
-        <div className="douyin-empty">
-          <h2>暂无抖音视频</h2>
-          <p>请先在来源配置中添加抖音库来源</p>
-          <button className="douyin-btn" onClick={() => navigate('/sources')}>配置来源</button>
+      <div className="peak-page">
+        <div className="peak-empty">
+          <h2>暂无巅峰视频</h2>
+          <p>请先在来源配置中添加巅峰库来源</p>
+          <button className="peak-btn" onClick={() => navigate('/sources')}>配置来源</button>
         </div>
       </div>
     )
@@ -372,7 +370,7 @@ function DouyinLibrary() {
 
   return (
     <div
-      className="douyin-page"
+      className="peak-page"
       ref={containerRef}
       onWheel={handleWheel}
       onClick={handleClick}
@@ -383,8 +381,8 @@ function DouyinLibrary() {
       {/* 视频播放 */}
       <video
         ref={videoRef}
-        src={currentVideo ? douyinApi.getStreamUrl(currentVideo.id) : ''}
-        className="douyin-video"
+        src={currentVideo ? peakApi.getStreamUrl(currentVideo.id) : ''}
+        className="peak-video"
         autoPlay={isPlaying}
         loop={!isMobileView}
         playsInline
@@ -394,7 +392,7 @@ function DouyinLibrary() {
       {/* 双击喜欢动画 */}
       {showLikeAnimation && (
         <div className="like-animation">
-          <HeartFilled style={{ fontSize: 80, color: DouyinRed }} />
+          <HeartFilled style={{ fontSize: 80, color: PeakRed }} />
         </div>
       )}
 
@@ -403,9 +401,9 @@ function DouyinLibrary() {
         <button className="douyin-back-btn" onClick={(e) => { e.stopPropagation(); navigate('/videos') }}>
           <LeftOutlined />
         </button>
-        <div className={`douyin-filter-group ${showFilter ? '' : 'hidden'}`}>
+        <div className={`peak-filter-group ${showFilter ? '' : 'hidden'}`}>
           <select
-            className="douyin-filter-select"
+            className="peak-filter-select"
             value={filterType}
             onChange={(e) => { e.stopPropagation(); setFilterType(e.target.value) }}
             onClick={(e) => e.stopPropagation()}
@@ -425,44 +423,44 @@ function DouyinLibrary() {
         className={`douyin-mode-btn ${showControls ? '' : 'hidden'}`}
         onClick={(e) => { e.stopPropagation(); setIsRandom(!isRandom) }}
       >
-        <ShuffleIcon style={{ color: isRandom ? DouyinRed : '#fff' }} />
-        <span style={{ color: isRandom ? DouyinRed : '#fff', marginLeft: 4 }}>{isRandom ? '随机' : '顺序'}</span>
+        <ShuffleIcon style={{ color: isRandom ? PeakRed : '#fff' }} />
+        <span style={{ color: isRandom ? PeakRed : '#fff', marginLeft: 4 }}>{isRandom ? '随机' : '顺序'}</span>
       </div>
 
       {/* 右侧操作按钮 - 始终显示 */}
       <div className="douyin-right-btns">
-        <div className="douyin-btn-group">
+        <div className="peak-btn-group">
           <button className="douyin-action-btn" onClick={(e) => { e.stopPropagation(); toggleLike() }}>
             {currentVideo?.is_liked
-              ? <HeartFilled style={{ color: DouyinRed }} />
+              ? <HeartFilled style={{ color: PeakRed }} />
               : <HeartOutlined />}
           </button>
-          <span className="douyin-btn-text">喜欢</span>
+          <span className="peak-btn-text">喜欢</span>
         </div>
-        <div className="douyin-btn-group">
+        <div className="peak-btn-group">
           <button className="douyin-action-btn" onClick={(e) => { e.stopPropagation(); toggleFavorite() }}>
             {currentVideo?.is_favorite
-              ? <StarFilled style={{ color: DouyinGold }} />
+              ? <StarFilled style={{ color: PeakGold }} />
               : <StarOutlined />}
           </button>
-          <span className="douyin-btn-text">收藏</span>
+          <span className="peak-btn-text">收藏</span>
         </div>
-        <div className="douyin-btn-group">
+        <div className="peak-btn-group">
           <button className="douyin-action-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete() }}>
             <DeleteOutlined />
           </button>
-          <span className="douyin-btn-text">删除</span>
+          <span className="peak-btn-text">删除</span>
         </div>
       </div>
 
       {/* 底部进度条 */}
       <div
-        className={`douyin-progress ${isProgressVisible ? '' : 'hidden'}`}
+        className={`peak-progress ${isProgressVisible ? '' : 'hidden'}`}
         ref={progressRef}
         onClick={(e) => { e.stopPropagation(); handleProgressClick(e) }}
       >
-        <div className="douyin-progress-bar">
-          <div className="douyin-progress-filled" style={{ width: `${progressPercent}%` }} />
+        <div className="peak-progress-bar">
+          <div className="peak-progress-filled" style={{ width: `${progressPercent}%` }} />
         </div>
         <span className="douyin-time">
           {formatTime(currentTime)} / {formatTime(duration)}
@@ -470,12 +468,12 @@ function DouyinLibrary() {
       </div>
 
       {/* 视频信息 */}
-      <div className={`douyin-video-info ${showControls ? '' : 'hidden'}`}>
+      <div className={`peak-video-info ${showControls ? '' : 'hidden'}`}>
         <h3>{currentVideo?.title}</h3>
         {currentVideo?.tags?.length > 0 && (
           <div className="douyin-tags">
             {currentVideo.tags.map(t => (
-              <span key={t.id} className="douyin-tag" style={{ borderColor: t.color || DouyinRed }}>
+              <span key={t.id} className="douyin-tag" style={{ borderColor: t.color || PeakRed }}>
                 {t.name}
               </span>
             ))}
@@ -509,4 +507,4 @@ function DouyinLibrary() {
   )
 }
 
-export default DouyinLibrary
+export default PeakLibrary

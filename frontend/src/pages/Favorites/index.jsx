@@ -13,8 +13,9 @@ import {
   VideoCameraOutlined,
   PictureOutlined,
   PlayCircleOutlined,
+  FireOutlined,
 } from '@ant-design/icons'
-import { favoritesApi, likesApi, videosApi, imagesApi, douyinApi } from '@services/api'
+import { favoritesApi, likesApi, videosApi, imagesApi, douyinApi, peakApi } from '@services/api'
 import MediaGrid from '@components/MediaGrid'
 import Slideshow from '@components/Slideshow'
 
@@ -22,6 +23,7 @@ const { Title, Text } = Typography
 
 const DouyinRed = '#FE2C55'
 const DouyinGold = '#FFD700'
+const PeakOrange = '#FF6B00'
 
 function Favorites() {
   const navigate = useNavigate()
@@ -41,6 +43,8 @@ function Favorites() {
     imageFavorites: 0,
     douyinLikes: 0,
     douyinFavorites: 0,
+    peakLikes: 0,
+    peakFavorites: 0,
   })
 
   // 当前Tab: likes | favorites
@@ -56,7 +60,16 @@ function Favorites() {
     setLoading(true)
     try {
       let response
-      if (mediaType === 'douyin') {
+      if (mediaType === 'peak') {
+        // 巅峰库
+        const params = {
+          page: pagination.current,
+          per_page: pagination.pageSize,
+        }
+        if (mainTab === 'likes') params.liked = true
+        else params.favorite = true
+        response = await peakApi.getList(params)
+      } else if (mediaType === 'douyin') {
         // 抖音库
         const params = {
           page: pagination.current,
@@ -108,6 +121,9 @@ function Favorites() {
       // 抖音库统计
       const douyinStatsRes = await douyinApi.getStats()
 
+      // 巅峰库统计
+      const peakStatsRes = await peakApi.getStats()
+
       setStats({
         videoLikes: videoLikesRes.total || 0,
         videoFavorites: videoFavsRes.total || 0,
@@ -115,6 +131,8 @@ function Favorites() {
         imageFavorites: imageFavsRes.total || 0,
         douyinLikes: douyinStatsRes.liked || 0,
         douyinFavorites: douyinStatsRes.favorite || 0,
+        peakLikes: peakStatsRes.liked || 0,
+        peakFavorites: peakStatsRes.favorite || 0,
       })
     } catch (error) {
       console.error('Failed to fetch stats:', error)
@@ -150,7 +168,15 @@ function Favorites() {
   // 取消喜欢/收藏
   const handleToggle = async (item) => {
     try {
-      if (mediaType === 'douyin') {
+      if (mediaType === 'peak') {
+        if (mainTab === 'likes') {
+          await peakApi.toggleLike(item.id)
+          message.success('已取消喜欢')
+        } else {
+          await peakApi.toggleFavorite(item.id)
+          message.success('已取消收藏')
+        }
+      } else if (mediaType === 'douyin') {
         if (mainTab === 'likes') {
           await douyinApi.toggleLike(item.id)
           message.success('已取消喜欢')
@@ -178,7 +204,9 @@ function Favorites() {
 
   // 视频点击播放
   const handleVideoClick = (video) => {
-    if (mediaType === 'douyin') {
+    if (mediaType === 'peak') {
+      navigate('/peak')
+    } else if (mediaType === 'douyin') {
       navigate('/douyin')
     } else {
       navigate(`/videos/${video.id}`)
@@ -193,8 +221,8 @@ function Favorites() {
   }
 
   // 计算总数
-  const totalLikes = stats.videoLikes + stats.imageLikes + stats.douyinLikes
-  const totalFavorites = stats.videoFavorites + stats.imageFavorites + stats.douyinFavorites
+  const totalLikes = stats.videoLikes + stats.imageLikes + stats.douyinLikes + stats.peakLikes
+  const totalFavorites = stats.videoFavorites + stats.imageFavorites + stats.douyinFavorites + stats.peakFavorites
 
   return (
     <div>
@@ -319,6 +347,35 @@ function Favorites() {
                 onFavorite={mainTab === 'favorites' ? handleToggle : undefined}
                 onLike={mainTab === 'likes' ? handleToggle : undefined}
                 onItemClick={() => navigate('/douyin')}
+              />
+            ),
+          },
+          {
+            key: 'peak',
+            label: (
+              <span>
+                <FireOutlined style={{ color: mediaType === 'peak' ? PeakOrange : undefined }} />
+                巅峰库
+                <Badge
+                  count={mainTab === 'likes' ? stats.peakLikes : stats.peakFavorites}
+                  style={{ marginLeft: 8, backgroundColor: PeakOrange }}
+                />
+              </span>
+            ),
+            children: (
+              <MediaGrid
+                items={items}
+                type="video"
+                loading={loading}
+                pagination={{
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  total: pagination.total,
+                  onChange: handlePageChange,
+                }}
+                onFavorite={mainTab === 'favorites' ? handleToggle : undefined}
+                onLike={mainTab === 'likes' ? handleToggle : undefined}
+                onItemClick={() => navigate('/peak')}
               />
             ),
           },

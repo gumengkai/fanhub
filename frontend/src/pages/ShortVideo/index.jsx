@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Space, Tag, Modal, Input, message, Select, Tooltip, Slider } from 'antd'
 import {
-  HeartOutlined, HeartFilled, StarOutlined, StarFilled, DeleteOutlined, TagsOutlined,
+  HeartOutlined, HeartFilled, StarOutlined, StarFilled, DeleteOutlined,
   PlayCircleOutlined, PauseCircleOutlined, StepBackwardOutlined, StepForwardOutlined,
   OrderedListOutlined, FullscreenOutlined, FullscreenExitOutlined,
   LeftOutlined, SoundOutlined, MutedOutlined, HomeOutlined,
   ClockCircleOutlined, EditOutlined,
 } from '@ant-design/icons'
-import { videosApi, tagsApi } from '@services/api'
+import { videosApi } from '@services/api'
 import './index.css'
 
 // Custom Shuffle icon since ShuffleOutlined is not available
@@ -27,26 +27,21 @@ const isMobile = () => window.innerWidth <= 768 || 'ontouchstart' in window
 function ShortVideo() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const tagParam = searchParams.get('tag')
   const [allVideos, setAllVideos] = useState([])
   const [playlist, setPlaylist] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isRandom, setIsRandom] = useState(false)
+  const [isRandom, setIsRandom] = useState(true)
   const [showControls, setShowControls] = useState(true)
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState(1)
-  const [showTags, setShowTags] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
-  const [filterType, setFilterType] = useState(tagParam ? 'tag' : 'all')
+  const [filterType, setFilterType] = useState('all')
   const [unwatchedOnly, setUnwatchedOnly] = useState(false)
-  const [selectedTag, setSelectedTag] = useState(tagParam ? parseInt(tagParam) : null)
-  const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
-  const [tags, setTags] = useState([])
   const [editingVideo, setEditingVideo] = useState(null)
   const [editedTitle, setEditedTitle] = useState('')
   const [editedDescription, setEditedDescription] = useState('')
-  const [selectedTags, setSelectedTags] = useState([])
+  const [showEditModal, setShowEditModal] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -74,7 +69,6 @@ function ShortVideo() {
 
   useEffect(() => {
     fetchAllVideos()
-    fetchTags()
   }, [])
 
   const fetchAllVideos = async () => {
@@ -90,8 +84,8 @@ function ShortVideo() {
         return
       }
 
-      // 获取全部视频
-      const response = await fetch(`/api/videos?per_page=${total}`)
+      // 获取全部视频，使用随机排序
+      const response = await fetch(`/api/videos?per_page=${total}&sort_by=random`)
       const data = await response.json()
       const videos = data.items || []
       setAllVideos(videos)
@@ -99,15 +93,6 @@ function ShortVideo() {
       if (videos.length > 0) preloadVideo(videos[0])
     } catch (error) {
       message.error('获取视频列表失败')
-    }
-  }
-
-  const fetchTags = async () => {
-    try {
-      const response = await tagsApi.getList()
-      setTags(response || [])
-    } catch (error) {
-      console.error('Failed to fetch tags:', error)
     }
   }
 
@@ -123,15 +108,12 @@ function ShortVideo() {
     let filtered = allVideos
     if (filterType === 'liked') filtered = allVideos.filter(v => v.is_liked)
     else if (filterType === 'favorite') filtered = allVideos.filter(v => v.is_favorite)
-    else if (filterType === 'tag' && selectedTag) {
-      filtered = allVideos.filter(v => v.tags && v.tags.some(t => t.id === selectedTag))
-    }
-    
+
     // 应用未观看筛选
     if (unwatchedOnly) {
       filtered = filtered.filter(v => !v.view_count || v.view_count === 0)
     }
-    
+
     setPlaylist(filtered)
     // 如果当前视频在新筛选列表中，保持当前索引，否则重置为0
     const currentVideoId = playlist[currentIndex]?.id
@@ -141,14 +123,14 @@ function ShortVideo() {
     } else if (newIndex !== currentIndex) {
       setCurrentIndex(newIndex)
     }
-  }, [filterType, selectedTag, allVideos, unwatchedOnly])
+  }, [filterType, allVideos, unwatchedOnly])
 
   useEffect(() => {
     const handleMouseMove = () => {
       setShowControls(true)
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
-      // 如果下拉框打开或视频暂停，不自动隐藏控制栏
-      if (isPlaying && !tagDropdownOpen) {
+      // 如果视频暂停，不自动隐藏控制栏
+      if (isPlaying) {
         controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000)
       }
     }
@@ -157,7 +139,7 @@ function ShortVideo() {
     if (container) {
       container.addEventListener('mousemove', handleMouseMove)
       container.addEventListener('mouseleave', () => {
-        if (isPlaying && !tagDropdownOpen) setShowControls(false)
+        if (isPlaying) setShowControls(false)
       })
       container.addEventListener('mouseenter', () => setShowControls(true))
     }
@@ -166,7 +148,7 @@ function ShortVideo() {
       if (container) container.removeEventListener('mousemove', handleMouseMove)
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
     }
-  }, [isPlaying, tagDropdownOpen])
+  }, [isPlaying])
 
   useEffect(() => {
     const video = videoRef.current
@@ -207,8 +189,8 @@ function ShortVideo() {
         case 'f': toggleFullscreen(); break
         case 'm': toggleMute(); break
         case 'r': setIsRandom(prev => !prev); break
-        case 'l': if (currentVideo) openTagModal(); break
-        case 'c': if (currentVideo) toggleLike(); break
+        case 'e': if (currentVideo) openEditModal(); break
+        case 'l': if (currentVideo) toggleLike(); break
         case 's': if (currentVideo) toggleFavorite(); break
         case 'Escape': if (isFullscreen) toggleFullscreen(); else navigate('/videos'); break
         default: break
@@ -229,11 +211,6 @@ function ShortVideo() {
         }).catch(console.error)
       }
     }, 500)
-  }
-
-  // 处理标签选择 - 只在确认后应用筛选
-  const handleTagSelect = (value) => {
-    setSelectedTag(value)
   }
 
   const togglePlay = () => {
@@ -387,34 +364,25 @@ function ShortVideo() {
     } catch (error) { message.error('操作失败') }
   }
 
-  const openTagModal = () => {
+  const openEditModal = () => {
     setEditingVideo(currentVideo)
     setEditedTitle(currentVideo.title)
     setEditedDescription(currentVideo.description || '')
-    setSelectedTags(currentVideo.tags ? currentVideo.tags.map(t => t.id) : [])
-    setShowTags(true)
+    setShowEditModal(true)
   }
 
-  const handleSaveTags = async () => {
+  const handleSaveEdit = async () => {
     if (!editingVideo) return
     try {
       await videosApi.update(editingVideo.id, { title: editedTitle, description: editedDescription })
-      const currentTagIds = editingVideo.tags ? editingVideo.tags.map(t => t.id) : []
-      for (const tagId of currentTagIds) {
-        if (!selectedTags.includes(tagId)) await videosApi.removeTag(editingVideo.id, tagId)
-      }
-      for (const tagId of selectedTags) {
-        if (!currentTagIds.includes(tagId)) await videosApi.addTag(editingVideo.id, tagId)
-      }
       // 只更新当前视频的信息，不刷新整个列表
-      const updatedTags = tags.filter(t => selectedTags.includes(t.id))
-      const updatedVideo = { ...editingVideo, title: editedTitle, description: editedDescription, tags: updatedTags }
+      const updatedVideo = { ...editingVideo, title: editedTitle, description: editedDescription }
       const newPlaylist = playlist.map((v, i) =>
         i === currentIndex ? updatedVideo : v
       )
       setPlaylist(newPlaylist)
       setAllVideos(prev => prev.map(v => v.id === editingVideo.id ? updatedVideo : v))
-      setShowTags(false)
+      setShowEditModal(false)
       message.success('保存成功')
     } catch (error) { message.error('保存失败') }
   }
@@ -521,7 +489,6 @@ function ShortVideo() {
             <Option value="all">全部视频</Option>
             <Option value="liked">喜欢</Option>
             <Option value="favorite">收藏</Option>
-            <Option value="tag">标签筛选</Option>
           </Select>
           <Button 
             type={unwatchedOnly ? 'primary' : 'default'}
@@ -531,24 +498,6 @@ function ShortVideo() {
           >
             {unwatchedOnly ? '未观看 ✓' : '未观看'}
           </Button>
-          {filterType === 'tag' && (
-            <Select
-              value={selectedTag}
-              onChange={handleTagSelect}
-              style={{ width: isMobileView ? 120 : 150 }}
-              placeholder="选择标签"
-              allowClear
-              onClear={() => handleTagSelect(null)}
-              dropdownMatchSelectWidth={false}
-              size={isMobileView ? 'small' : 'middle'}
-              onDropdownVisibleChange={(open) => {
-                setTagDropdownOpen(open)
-                if (open) setShowControls(true)
-              }}
-            >
-              {tags.map(tag => <Option key={tag.id} value={tag.id}>{tag.name}</Option>)}
-            </Select>
-          )}
         </div>
         <Space>
           <Button type={isRandom ? 'primary' : 'default'} icon={<ShuffleIcon />} onClick={() => setIsRandom(!isRandom)} size={isMobileView ? 'small' : 'middle'}>
@@ -576,11 +525,6 @@ function ShortVideo() {
           <div className="video-info">
             <h3 className="video-title">{currentVideo?.title}</h3>
             {currentVideo?.description && <p className="video-description">{currentVideo.description}</p>}
-            {currentVideo?.tags && currentVideo.tags.length > 0 && (
-              <div className="video-tags">
-                {currentVideo.tags.map(tag => <Tag key={tag.id} color={tag.color || '#fb7299'}>{tag.name}</Tag>)}
-              </div>
-            )}
           </div>
         </div>
 
@@ -611,12 +555,12 @@ function ShortVideo() {
           <div className="action-group">
             <Button
               type="text"
-              icon={<TagsOutlined />}
-              onClick={openTagModal}
+              icon={<EditOutlined />}
+              onClick={openEditModal}
               size="large"
               className="action-btn"
             />
-            <span className="action-btn-text">标签</span>
+            <span className="action-btn-text">编辑</span>
           </div>
 
           <div className="action-group delete-group">
@@ -718,12 +662,12 @@ function ShortVideo() {
         </div>
       </div>
 
-      {/* 标签编辑弹窗 */}
+      {/* 编辑弹窗 */}
       <Modal
-        open={showTags}
+        open={showEditModal}
         title="编辑视频信息"
-        onCancel={() => setShowTags(false)}
-        onOk={handleSaveTags}
+        onCancel={() => setShowEditModal(false)}
+        onOk={handleSaveEdit}
         width={isMobileView ? '90%' : 600}
         centered
       >
@@ -735,12 +679,6 @@ function ShortVideo() {
           <div className="form-item">
             <label>描述</label>
             <TextArea value={editedDescription} onChange={(e) => setEditedDescription(e.target.value)} placeholder="视频描述（可选）" rows={3} />
-          </div>
-          <div className="form-item">
-            <label>标签</label>
-            <Select mode="multiple" value={selectedTags} onChange={setSelectedTags} style={{ width: '100%' }} placeholder="选择标签">
-              {tags.map(tag => <Option key={tag.id} value={tag.id}>{tag.name}</Option>)}
-            </Select>
           </div>
         </div>
       </Modal>

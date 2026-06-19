@@ -114,8 +114,10 @@ function SourceConfig() {
       const messages = []
       if (stats.videos_added > 0) messages.push(`新增 ${stats.videos_added} 个视频`)
       if (stats.videos_updated > 0) messages.push(`更新 ${stats.videos_updated} 个视频`)
+      if (stats.videos_removed > 0) messages.push(`删除 ${stats.videos_removed} 个视频`)
       if (stats.images_added > 0) messages.push(`新增 ${stats.images_added} 个图片`)
       if (stats.images_updated > 0) messages.push(`更新 ${stats.images_updated} 个图片`)
+      if (stats.images_removed > 0) messages.push(`删除 ${stats.images_removed} 个图片`)
       
       message.success(`扫描完成：${messages.join(', ') || '无变化'}`)
       fetchSources()
@@ -150,6 +152,8 @@ function SourceConfig() {
         return { text: '图片', icon: <PictureOutlined />, color: 'green' }
       case 'douyin':
         return { text: '抖音库', icon: <PlayCircleOutlined />, color: 'magenta' }
+      case 'peak':
+        return { text: '巅峰库', icon: <PlayCircleOutlined />, color: 'red' }
       default:
         return { text: '全部', icon: <AppstoreOutlined />, color: 'default' }
     }
@@ -310,8 +314,8 @@ function SourceConfig() {
       </div>
 
       <Card style={{ marginBottom: 24 }}>
-        <Row gutter={16}>
-          <Col span={6}>
+        <Row gutter={[16, 16]}>
+          <Col span={4}>
             <Statistic
               title="视频源"
               value={sources.filter(s => s.media_type === 'video').length}
@@ -319,7 +323,7 @@ function SourceConfig() {
               valueStyle={{ color: '#1890ff' }}
             />
           </Col>
-          <Col span={6}>
+          <Col span={4}>
             <Statistic
               title="图片源"
               value={sources.filter(s => s.media_type === 'image').length}
@@ -327,7 +331,7 @@ function SourceConfig() {
               valueStyle={{ color: '#52c41a' }}
             />
           </Col>
-          <Col span={6}>
+          <Col span={4}>
             <Statistic
               title="抖音库"
               value={sources.filter(s => s.media_type === 'douyin').length}
@@ -335,12 +339,28 @@ function SourceConfig() {
               valueStyle={{ color: '#eb2f96' }}
             />
           </Col>
-          <Col span={6}>
+          <Col span={4}>
+            <Statistic
+              title="巅峰库"
+              value={sources.filter(s => s.media_type === 'peak').length}
+              prefix={<PlayCircleOutlined />}
+              valueStyle={{ color: '#f5222d' }}
+            />
+          </Col>
+          <Col span={4}>
             <Statistic
               title="混合源"
               value={sources.filter(s => s.media_type === 'all').length}
               prefix={<AppstoreOutlined />}
               valueStyle={{ color: '#722ed1' }}
+            />
+          </Col>
+          <Col span={4}>
+            <Statistic
+              title="总来源"
+              value={sources.length}
+              prefix={<AppstoreOutlined />}
+              valueStyle={{ color: '#595959' }}
             />
           </Col>
         </Row>
@@ -399,6 +419,7 @@ function SourceConfig() {
                   <Option value="video"><VideoCameraOutlined /> 仅视频</Option>
                   <Option value="image"><PictureOutlined /> 仅图片</Option>
                   <Option value="douyin"><PlayCircleOutlined /> 抖音库</Option>
+                  <Option value="peak"><PlayCircleOutlined /> 巅峰库</Option>
                 </Select>
               </Form.Item>
             </Col>

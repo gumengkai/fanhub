@@ -12,6 +12,7 @@ import {
   CloseOutlined,
   UserOutlined,
   AppstoreOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './index.css'
@@ -23,6 +24,7 @@ const navItems = [
   { key: '/', icon: <HomeOutlined />, label: '首页', path: '/' },
   { key: '/videos', icon: <VideoCameraOutlined />, label: '视频库', path: '/videos' },
   { key: '/douyin', icon: <AppstoreOutlined />, label: '抖音库', path: '/douyin' },
+  { key: '/peak', icon: <PlayCircleOutlined />, label: '巅峰库', path: '/peak' },
   { key: '/short-video', icon: <PlayCircleOutlined />, label: '短视频', path: '/short-video' },
   { key: '/images', icon: <PictureOutlined />, label: '图片库', path: '/images' },
   { key: '/favorites', icon: <UserOutlined />, label: '个人中心', path: '/favorites' },
@@ -32,6 +34,7 @@ const mobileNavItems = [
   { key: '/', icon: <HomeOutlined />, label: '首页', path: '/' },
   { key: '/videos', icon: <VideoCameraOutlined />, label: '视频', path: '/videos' },
   { key: '/douyin', icon: <AppstoreOutlined />, label: '抖音', path: '/douyin' },
+  { key: '/peak', icon: <PlayCircleOutlined />, label: '巅峰', path: '/peak' },
   { key: '/short-video', icon: <PlayCircleOutlined />, label: '短视频', path: '/short-video' },
   { key: '/images', icon: <PictureOutlined />, label: '图片', path: '/images' },
   { key: '/favorites', icon: <UserOutlined />, label: '中心', path: '/favorites' },
@@ -69,6 +72,12 @@ function AppLayout({ children }) {
       icon: <SettingOutlined />,
       label: '来源设置',
       onClick: () => navigate('/sources'),
+    },
+    {
+      key: 'scan-logs',
+      icon: <FileTextOutlined />,
+      label: '扫描日志',
+      onClick: () => navigate('/scan-logs'),
     },
   ]
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Typography,
@@ -7,8 +7,6 @@ import {
   Input,
   Button,
   message,
-  Empty,
-  Tag,
 } from 'antd'
 import {
   DeleteOutlined,
@@ -18,10 +16,9 @@ import {
   StarFilled,
   PlayCircleOutlined,
   FilterOutlined,
-  TagsOutlined,
   EyeInvisibleOutlined,
 } from '@ant-design/icons'
-import { videosApi, tagsApi } from '@services/api'
+import { videosApi } from '@services/api'
 import MediaGrid from '@components/MediaGrid'
 
 const { Title } = Typography
@@ -34,115 +31,123 @@ function VideoLibrary() {
   const location = useLocation()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(false)
-  const [tags, setTags] = useState([])
 
   // 从 URL 参数恢复状态
-  const [pagination, setPagination] = useState({
-    current: parseInt(searchParams.get('page') || '1', 10),
-    pageSize: parseInt(searchParams.get('pageSize') || '24', 10),
-    total: 0,
-  })
-  const [sortBy, setSortBy] = useState(searchParams.get('sort')?.split('_')[0] || 'created_at')
-  const [sortOrder, setSortOrder] = useState(searchParams.get('sort')?.split('_')[1] || 'desc')
+  const urlSort = searchParams.get('sort') || 'random_desc'
+  const urlSortParts = urlSort.split('_')
+  
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1', 10))
+  const [pageSize, setPageSize] = useState(parseInt(searchParams.get('pageSize') || '24', 10))
+  const [total, setTotal] = useState(0)
+  const [sortBy, setSortBy] = useState(urlSortParts[0] || 'random')
+  const [sortOrder, setSortOrder] = useState(urlSortParts[1] || 'desc')
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [filterType, setFilterType] = useState(searchParams.get('filter') || 'all')
-  const [selectedTag, setSelectedTag] = useState(searchParams.get('tag') ? parseInt(searchParams.get('tag'), 10) : null)
 
-  // 更新 URL 参数的辅助函数
-  const updateUrlParams = useCallback((updates = {}) => {
-    const params = {}
-    const page = updates.page ?? pagination.current
-    const pageSize = updates.pageSize ?? pagination.pageSize
-    const sort = updates.sort ?? `${sortBy}_${sortOrder}`
-    const search = updates.search ?? searchQuery
-    const filter = updates.filter ?? filterType
-    const tag = updates.tag ?? selectedTag
+  // 使用 ref 存储最新的请求参数，避免闭包问题
+  const latestParams = useRef({
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+    searchQuery,
+    filterType
+  })
 
-    // 只添加非默认值的参数
-    if (page > 1) params.page = page.toString()
-    if (pageSize !== 24) params.pageSize = pageSize.toString()
-    if (sort !== 'created_at_desc') params.sort = sort
-    if (search) params.search = search
-    if (filter !== 'all') params.filter = filter
-    if (tag) params.tag = tag.toString()
-
-    setSearchParams(params, { replace: true })
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, filterType, selectedTag, setSearchParams])
-
-  // Fetch all tags for filter dropdown
+  // 同步 ref 与 state
   useEffect(() => {
-    fetchTags()
-  }, [])
-
-  const fetchTags = async () => {
-    try {
-      const response = await tagsApi.getList()
-      setTags(response || [])
-    } catch (error) {
-      console.error('Failed to fetch tags:', error)
+    latestParams.current = {
+      currentPage,
+      pageSize,
+      sortBy,
+      sortOrder,
+      searchQuery,
+      filterType
     }
-  }
+  }, [currentPage, pageSize, sortBy, sortOrder, searchQuery, filterType])
 
+  // 获取视频列表 - 使用 ref 中的最新值
   const fetchVideos = useCallback(async () => {
+    const params = latestParams.current
     setLoading(true)
     try {
-      const params = {
-        page: pagination.current,
-        per_page: pagination.pageSize,
-        sort_by: sortBy,
-        order: sortOrder,
-        search: searchQuery || searchParams.get('search') || '',
+      const apiParams = {
+        page: params.currentPage,
+        per_page: params.pageSize,
+        sort_by: params.sortBy,
+        order: params.sortOrder,
+        search: params.searchQuery,
       }
-      if (filterType === 'liked') {
-        params.liked = true
-      } else if (filterType === 'favorite') {
-        params.favorite = true
-      } else if (filterType === 'unwatched') {
-        params.unwatched = true
-      }
-      if (selectedTag) {
-        params.tag_id = selectedTag
+      if (params.filterType === 'liked') {
+        apiParams.liked = true
+      } else if (params.filterType === 'favorite') {
+        apiParams.favorite = true
+      } else if (params.filterType === 'unwatched') {
+        apiParams.unwatched = true
       }
 
-      const response = await videosApi.getList(params)
+      console.log('Fetching videos with params:', apiParams)
+
+      const response = await videosApi.getList(apiParams)
 
       setVideos(response.items || [])
-      setPagination(prev => ({
-        ...prev,
-        total: response.total || 0,
-      }))
+      setTotal(response.total || 0)
     } catch (error) {
       message.error('获取视频列表失败')
       console.error(error)
     } finally {
       setLoading(false)
     }
-  }, [pagination.current, pagination.pageSize, sortBy, sortOrder, searchQuery, searchParams, filterType, selectedTag])
+  }, []) // 空依赖数组，使用 ref 获取最新值
 
+  // 当依赖项变化时重新获取数据
   useEffect(() => {
     fetchVideos()
-  }, [fetchVideos])
+  }, [currentPage, pageSize, sortBy, sortOrder, searchQuery, filterType, fetchVideos])
 
-  const handlePageChange = (page, pageSize) => {
-    setPagination(prev => ({
-      ...prev,
-      current: page,
-      pageSize: pageSize,
-    }))
-    updateUrlParams({ page, pageSize })
+  // 更新 URL 参数
+  const updateUrlParams = useCallback((updates) => {
+    const params = {}
+    const currentParams = latestParams.current
+    const page = updates.page ?? currentParams.currentPage
+    const size = updates.pageSize ?? currentParams.pageSize
+    const sort = updates.sort ?? `${currentParams.sortBy}_${currentParams.sortOrder}`
+    const search = updates.search ?? currentParams.searchQuery
+    const filter = updates.filter ?? currentParams.filterType
+
+    if (page > 1) params.page = page.toString()
+    if (size !== 24) params.pageSize = size.toString()
+    if (sort !== 'random_desc') params.sort = sort
+    if (search) params.search = search
+    if (filter !== 'all') params.filter = filter
+
+    setSearchParams(params, { replace: true })
+  }, [setSearchParams])
+
+  const handlePageChange = (page, newPageSize) => {
+    setCurrentPage(page)
+    setPageSize(newPageSize)
+    updateUrlParams({ page, pageSize: newPageSize })
   }
 
   const handleSortChange = (value) => {
-    const [field, order] = value.split('_')
+    console.log('Sort changed to:', value)
+    // 正确拆分：最后一个 _ 后面是 order，前面的是 field
+    const lastUnderscoreIndex = value.lastIndexOf('_')
+    const field = value.slice(0, lastUnderscoreIndex)
+    const order = value.slice(lastUnderscoreIndex + 1)
+    console.log('Parsed field:', field, 'order:', order)
     setSortBy(field)
     setSortOrder(order)
-    setPagination(prev => ({ ...prev, current: 1 }))
+    setCurrentPage(1)
     updateUrlParams({ sort: value, page: 1 })
+    // 立即触发重新获取，不等待 useEffect
+    setTimeout(() => fetchVideos(), 0)
   }
 
   const handleSearch = (value) => {
     setSearchQuery(value)
-    setPagination(prev => ({ ...prev, current: 1 }))
+    setCurrentPage(1)
     updateUrlParams({ search: value, page: 1 })
   }
 
@@ -150,7 +155,6 @@ function VideoLibrary() {
     try {
       await videosApi.toggleFavorite(video.id)
       message.success(video.is_favorite ? '已取消收藏' : '已添加到收藏')
-      // 只更新当前视频的收藏状态，不刷新整个列表
       setVideos(videos.map(v =>
         v.id === video.id ? { ...v, is_favorite: !v.is_favorite } : v
       ))
@@ -163,7 +167,6 @@ function VideoLibrary() {
     try {
       await videosApi.toggleLike(video.id)
       message.success(video.is_liked ? '已取消喜欢' : '已添加到喜欢')
-      // 只更新当前视频的喜欢状态，不刷新整个列表
       setVideos(videos.map(v =>
         v.id === video.id ? { ...v, is_liked: !v.is_liked } : v
       ))
@@ -183,26 +186,16 @@ function VideoLibrary() {
   }
 
   const handlePlay = (video) => {
-    // 保存当前路径（包含所有 URL 参数）用于返回
     const returnPath = location.pathname + location.search
     navigate(`/videos/${video.id}`, { state: { returnPath } })
   }
 
-  const handlePlayByTag = () => {
-    if (selectedTag) {
-      navigate(`/short-video?tag=${selectedTag}`)
-    } else {
-      navigate('/short-video')
-    }
-  }
-
-  const handleTagChange = (value) => {
-    setSelectedTag(value)
-    setPagination(prev => ({ ...prev, current: 1 }))
-    updateUrlParams({ tag: value, page: 1 })
+  const handleShortVideoMode = () => {
+    navigate('/short-video')
   }
 
   const sortOptions = [
+    { value: 'random_desc', label: '随机排序' },
     { value: 'created_at_desc', label: '最新添加' },
     { value: 'created_at_asc', label: '最早添加' },
     { value: 'title_asc', label: '名称 (A-Z)' },
@@ -220,7 +213,8 @@ function VideoLibrary() {
           <Search
             placeholder="搜索视频..."
             allowClear
-            defaultValue={searchParams.get('search') || ''}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             onSearch={handleSearch}
             style={{ width: 300 }}
           />
@@ -236,28 +230,13 @@ function VideoLibrary() {
           </Select>
 
           <Select
-            value={selectedTag}
-            onChange={handleTagChange}
-            style={{ width: 150 }}
-            placeholder={<><TagsOutlined /> 按标签筛选</>}
-            allowClear
-          >
-            {tags.map((tag) => (
-              <Option key={tag.id} value={tag.id}>
-                <Tag color={tag.color} style={{ margin: 0 }}>{tag.name}</Tag>
-              </Option>
-            ))}
-          </Select>
-
-          <Select
             value={filterType}
             onChange={(value) => {
               setFilterType(value)
-              setPagination(prev => ({ ...prev, current: 1 }))
+              setCurrentPage(1)
               updateUrlParams({ filter: value, page: 1 })
             }}
             style={{ width: 130 }}
-            placeholder={<><FilterOutlined /> 筛选</>}
           >
             <Option value="all">全部视频</Option>
             <Option value="liked">
@@ -274,9 +253,9 @@ function VideoLibrary() {
           <Button
             type="primary"
             icon={<PlayCircleOutlined />}
-            onClick={handlePlayByTag}
+            onClick={handleShortVideoMode}
           >
-            {selectedTag ? '播放标签视频' : '短视频模式'}
+            短视频模式
           </Button>
         </Space>
       </div>
@@ -286,9 +265,9 @@ function VideoLibrary() {
         type="video"
         loading={loading}
         pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
+          current: currentPage,
+          pageSize: pageSize,
+          total: total,
           onChange: handlePageChange,
         }}
         onFavorite={handleFavorite}

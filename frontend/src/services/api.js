@@ -31,9 +31,6 @@ export const videosApi = {
   regenerateThumbnail: (id) => api.post(`/videos/${id}/thumbnail`),
   fixThumbnails: () => api.post('/videos/thumbnails/fix'),
   getStreamUrl: (id) => `/api/videos/${id}/stream`,
-  getTags: (id) => api.get(`/videos/${id}/tags`),
-  addTag: (id, tagId) => api.post(`/videos/${id}/tags`, { tag_id: tagId }),
-  removeTag: (id, tagId) => api.delete(`/videos/${id}/tags/${tagId}`),
   getRelated: (id, params = {}) => api.get(`/videos/${id}/related`, { params }),
 }
 
@@ -57,6 +54,10 @@ export const sourcesApi = {
   scan: (id) => api.post(`/sources/${id}/scan`),
   checkStatus: (id) => api.get(`/sources/${id}/status`),
   getStats: (id) => api.get(`/sources/${id}/stats`),
+  getScanLogs: (params = {}) => api.get('/sources/scan-logs', { params }),
+  getScanLog: (id) => api.get(`/sources/scan-logs/${id}`),
+  deleteScanLog: (id) => api.delete(`/sources/scan-logs/${id}`),
+  clearScanLogs: () => api.post('/sources/scan-logs/clear'),
 }
 
 export const favoritesApi = {
@@ -67,13 +68,6 @@ export const favoritesApi = {
 export const likesApi = {
   getList: (params = {}) => api.get('/likes', { params }),
   getStats: () => api.get('/likes/stats'),
-}
-
-export const tagsApi = {
-  getList: () => api.get('/tags'),
-  create: (data) => api.post('/tags', data),
-  update: (id, data) => api.put(`/tags/${id}`, data),
-  delete: (id) => api.delete(`/tags/${id}`),
 }
 
 export const historyApi = {
@@ -94,6 +88,22 @@ export const douyinApi = {
   getStreamUrl: (id) => `/api/douyin/${id}/stream`,
   getThumbnailUrl: (id) => `/api/douyin/${id}/thumbnail`,
   updateHistory: (id, data) => api.post(`/douyin/${id}/history`, data),
+}
+
+export const peakApi = {
+  getList: (params = {}) => api.get('/peak', { params }),
+  getById: (id) => api.get(`/peak/${id}`),
+  toggleLike: (id) => api.post(`/peak/${id}/like`),
+  toggleFavorite: (id) => api.post(`/peak/${id}/favorite`),
+  delete: (id) => api.delete(`/peak/${id}`),
+  getStats: () => api.get('/peak/stats'),
+  getStreamUrl: (id) => `/api/peak/${id}/stream`,
+  getThumbnailUrl: (id) => `/api/peak/${id}/thumbnail`,
+  updateHistory: (id, data) => api.post(`/peak/${id}/history`, data),
+}
+
+export const wordcloudApi = {
+  getList: (params = {}) => api.get('/wordcloud', { params }),
 }
 
 export default api

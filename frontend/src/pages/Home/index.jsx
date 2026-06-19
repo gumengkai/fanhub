@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react'
-import { Row, Col, Card, Statistic, Typography, Badge, Space, List, Tag as AntTag } from 'antd'
+import { Row, Col, Card, Statistic, Typography, Badge, Space, List, Tag } from 'antd'
 import {
   VideoCameraOutlined,
   PictureOutlined,
   HeartOutlined,
   EyeOutlined,
   FireOutlined,
-  TagOutlined,
   PlayCircleOutlined,
+  CloudOutlined,
 } from '@ant-design/icons'
 import { Link, useNavigate } from 'react-router-dom'
-import { videosApi, imagesApi, tagsApi, douyinApi } from '@services/api'
+import { videosApi, imagesApi, douyinApi, peakApi, wordcloudApi } from '@services/api'
 import MediaCard from '@components/MediaCard'
 import './index.css'
 
@@ -28,6 +28,8 @@ function Home() {
     favoriteImages: 0,
     totalDouyin: 0,
     likedDouyin: 0,
+    totalPeak: 0,
+    likedPeak: 0,
   })
 
   // 热门视频Top10
@@ -36,8 +38,10 @@ function Home() {
   const [favoriteVideos, setFavoriteVideos] = useState([])
   // 抖音库热门视频
   const [hotDouyin, setHotDouyin] = useState([])
-  // 热门标签Top10
-  const [hotTags, setHotTags] = useState([])
+  // 巅峰库热门视频
+  const [hotPeak, setHotPeak] = useState([])
+  // 词云数据
+  const [wordcloud, setWordcloud] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
@@ -47,12 +51,13 @@ function Home() {
     setLoading(true)
     try {
       // 1. 获取统计数据
-      const [videosRes, imagesRes, favVideosRes, favImagesRes, douyinStatsRes] = await Promise.all([
+      const [videosRes, imagesRes, favVideosRes, favImagesRes, douyinStatsRes, peakStatsRes] = await Promise.all([
         videosApi.getList({ per_page: 1 }),
         imagesApi.getList({ per_page: 1 }),
         videosApi.getList({ per_page: 1, favorite: true }),
         imagesApi.getList({ per_page: 1, favorite: true }),
         douyinApi.getStats(),
+        peakApi.getStats(),
       ])
 
       setStats({
@@ -62,6 +67,8 @@ function Home() {
         favoriteImages: favImagesRes.total || 0,
         totalDouyin: douyinStatsRes.total || 0,
         likedDouyin: douyinStatsRes.liked || 0,
+        totalPeak: peakStatsRes.total || 0,
+        likedPeak: peakStatsRes.liked || 0,
       })
 
       // 2. 获取热门视频Top10（按播放次数排序）
@@ -89,12 +96,17 @@ function Home() {
       })
       setHotDouyin(hotDouyinRes.items || [])
 
-      // 5. 获取热门标签Top10
-      const tagsRes = await tagsApi.getList()
-      const sortedTags = (tagsRes || [])
-        .sort((a, b) => (b.video_count || 0) - (a.video_count || 0))
-        .slice(0, 10)
-      setHotTags(sortedTags)
+      // 5. 获取巅峰库热门视频
+      const hotPeakRes = await peakApi.getList({
+        per_page: 6,
+        sort_by: 'view_count',
+        order: 'desc',
+      })
+      setHotPeak(hotPeakRes.items || [])
+
+      // 6. 获取词云数据
+      const wordcloudRes = await wordcloudApi.getList({ limit: 30, min_count: 2 })
+      setWordcloud(wordcloudRes || [])
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
     } finally {
@@ -128,6 +140,18 @@ function Home() {
       link: '/douyin',
     },
     {
+      title: '巅峰库',
+      value: stats.totalPeak,
+      icon: <FireOutlined style={{ color: '#FF6B00' }} />,
+      link: '/peak',
+    },
+    {
+      title: '巅峰喜欢',
+      value: stats.likedPeak,
+      icon: <HeartOutlined style={{ color: '#FF6B00' }} />,
+      link: '/peak',
+    },
+    {
       title: '总图片数',
       value: stats.totalImages,
       icon: <PictureOutlined style={{ color: '#52c41a' }} />,
@@ -149,8 +173,12 @@ function Home() {
     navigate('/douyin')
   }
 
-  const handleTagClick = (tagId) => {
-    navigate(`/videos?tag=${tagId}`)
+  const handlePeakClick = () => {
+    navigate('/peak')
+  }
+
+  const handleWordClick = (word) => {
+    navigate(`/videos?search=${encodeURIComponent(word)}`)
   }
 
   return (
@@ -281,47 +309,76 @@ function Home() {
               <Text type="secondary">暂无抖音视频</Text>
             )}
           </Card>
-        </Col>
 
-        {/* 右侧：热门标签 */}
-        <Col xs={24} lg={6}>
+          {/* 巅峰库热门 */}
           <Card
-            className="section-card tags-card"
+            className="section-card"
             title={
               <Space>
-                <TagOutlined style={{ color: '#1890ff' }} />
-                <span>热门标签 Top10</span>
+                <FireOutlined style={{ color: '#FF6B00' }} />
+                <span>巅峰库热门</span>
+              </Space>
+            }
+            extra={<Link to="/peak">进入巅峰库</Link>}
+            loading={loading}
+            style={{ marginTop: 24 }}
+          >
+            {hotPeak.length > 0 ? (
+              <Row gutter={[8, 8]}>
+                {hotPeak.map((video, index) => (
+                  <Col span={12} key={video.id}>
+                    <div className="peak-item" onClick={handlePeakClick}>
+                      <div className={`peak-rank ${index < 3 ? 'top-three' : ''}`}>
+                        {index + 1}
+                      </div>
+                      <MediaCard
+                        item={video}
+                        type="video"
+                        onClick={handlePeakClick}
+                      />
+                      <div className="peak-like">
+                        {video.is_liked && <HeartOutlined style={{ color: '#FF6B00' }} />}
+                      </div>
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <Text type="secondary">暂无巅峰视频</Text>
+            )}
+          </Card>
+        </Col>
+
+        {/* 右侧：词云 */}
+        <Col xs={24} lg={6}>
+          <Card
+            className="section-card wordcloud-card"
+            title={
+              <Space>
+                <CloudOutlined style={{ color: '#1890ff' }} />
+                <span>高频词汇</span>
               </Space>
             }
             loading={loading}
           >
-            {hotTags.length > 0 ? (
-              <List
-                dataSource={hotTags}
-                renderItem={(tag, index) => (
-                  <List.Item
-                    className="tag-list-item"
-                    onClick={() => handleTagClick(tag.id)}
+            {wordcloud.length > 0 ? (
+              <div className="wordcloud-container">
+                {wordcloud.slice(0, 30).map((item, index) => (
+                  <Tag
+                    key={index}
+                    className="wordcloud-tag"
+                    onClick={() => handleWordClick(item.word)}
+                    style={{
+                      fontSize: Math.max(12, Math.min(18, 12 + item.count / 10)),
+                      cursor: 'pointer',
+                    }}
                   >
-                    <div className="tag-item">
-                      <span className={`tag-rank ${index < 3 ? 'top-three' : ''}`}>
-                        {index + 1}
-                      </span>
-                      <AntTag
-                        color={tag.color || '#1890ff'}
-                        className="tag-name"
-                      >
-                        {tag.name}
-                      </AntTag>
-                      <span className="tag-count">
-                        {tag.video_count || 0} 个视频
-                      </span>
-                    </div>
-                  </List.Item>
-                )}
-              />
+                    {item.word} ({item.count})
+                  </Tag>
+                ))}
+              </div>
             ) : (
-              <Text type="secondary">暂无标签</Text>
+              <Text type="secondary">暂无词云数据</Text>
             )}
           </Card>
         </Col>

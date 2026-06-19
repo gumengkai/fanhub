@@ -26,7 +26,6 @@ import {
   LeftOutlined,
   DeleteOutlined,
   EditOutlined,
-  TagsOutlined,
   ClockCircleOutlined,
   FileOutlined,
   VideoCameraOutlined,
@@ -38,7 +37,6 @@ import {
 } from '@ant-design/icons'
 import { videosApi } from '@services/api'
 import VideoPlayer from '@components/VideoPlayer'
-import VideoTags from './VideoTags'
 import RelatedVideos from './RelatedVideos'
 import './index.css'
 
@@ -107,7 +105,7 @@ function VideoPlay() {
         params.favorite = true
       }
       if (listContext.selectedTag) {
-        params.tag_id = listContext.selectedTag
+        params.search = listContext.selectedTag // 词云词汇作为搜索关键字
       }
 
       const response = await videosApi.getList(params)
@@ -250,11 +248,6 @@ function VideoPlay() {
     } catch (error) {
       message.error('保存失败')
     }
-  }
-
-  // 只更新视频标签，不重新获取整个视频
-  const handleTagsUpdate = (updatedTags) => {
-    setVideo({ ...video, tags: updatedTags })
   }
 
   const handleProgressUpdate = async (videoId, position, duration, completed) => {
@@ -453,8 +446,6 @@ function VideoPlay() {
                     {video.description}
                   </Paragraph>
                 )}
-
-                <VideoTags videoId={video.id} tags={video.tags} onUpdate={handleTagsUpdate} />
 
                 <Divider />
 
