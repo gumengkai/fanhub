@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "FanHub"
 include(":app")
+include(":fantok")
+include(":fanpeak")
