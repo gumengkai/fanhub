@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fanhub.app.data.api.ApiService
 import com.fanhub.app.data.local.SettingsDataStore
-import com.fanhub.app.data.model.Tag
 import com.fanhub.app.data.model.parseVideoResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +29,6 @@ data class ProfileUiState(
     val likedImageCount: Int = 0,
     val favoriteVideoCount: Int = 0,
     val favoriteImageCount: Int = 0,
-    val tags: List<Tag> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -56,19 +54,9 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            // 并行加载喜欢、收藏和标签数据
+            // 并行加载喜欢和收藏数据
             launch { loadLikes() }
             launch { loadFavorites() }
-            launch { loadTags() }
-        }
-    }
-
-    private suspend fun loadTags() {
-        try {
-            val response = apiService.getTags()
-            _uiState.update { it.copy(tags = response.items) }
-        } catch (e: Exception) {
-            // Ignore tag loading error
         }
     }
 

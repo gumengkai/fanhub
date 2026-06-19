@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import com.fanhub.app.data.api.ApiService
-import com.fanhub.app.data.model.Tag
 import com.fanhub.app.data.model.Video
 import com.fanhub.app.data.repository.MediaRepository
 import com.fanhub.app.data.repository.HistoryRepository
@@ -19,8 +18,7 @@ import javax.inject.Inject
 
 data class DetailUiState(
     val video: Video? = null,
-    val isLoading: Boolean = false,
-    val allTags: List<Tag> = emptyList()
+    val isLoading: Boolean = false
 )
 
 @HiltViewModel
@@ -39,7 +37,6 @@ class MediaDetailViewModel @Inject constructor(
     fun load(videoId: Int) {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
-            // 加载视频信息
             mediaRepository.getVideo(videoId)
                 .onSuccess { video ->
                     _uiState.update { it.copy(video = video, isLoading = false) }
@@ -49,18 +46,6 @@ class MediaDetailViewModel @Inject constructor(
                     player.playWhenReady = true
                 }
                 .onFailure { _uiState.update { it.copy(isLoading = false) } }
-
-            // 加载所有标签
-            loadTags()
-        }
-    }
-
-    private suspend fun loadTags() {
-        try {
-            val tags = apiService.getTags().items ?: emptyList()
-            _uiState.update { it.copy(allTags = tags) }
-        } catch (e: Exception) {
-            // Ignore
         }
     }
 
@@ -92,39 +77,17 @@ class MediaDetailViewModel @Inject constructor(
         }
     }
 
-    fun updateVideoInfo(title: String, description: String, tagIds: List<Int>) {
-        val video = _uiState.value.video ?: return
+    fun updateVideoInfo(title: String, description: String?) {
+        val videoId = _uiState.value.video?.id ?: return
         viewModelScope.launch {
             try {
-                // 更新标题和描述
-                apiService.updateVideo(video.id, mapOf("title" to title, "description" to description))
-
-                // 获取当前视频的标签
-                val currentTags = apiService.getVideoTags(video.id).items.map { it.id }
-
-                // 移除不在新列表中的标签
-                for (tagId in currentTags) {
-                    if (!tagIds.contains(tagId)) {
-                        apiService.removeTagFromVideo(video.id, tagId)
-                    }
-                }
-
-                // 添加新标签
-                for (tagId in tagIds) {
-                    if (!currentTags.contains(tagId)) {
-                        apiService.addTagToVideo(video.id, mapOf("tag_id" to tagId))
-                    }
-                }
-
-                // 更新本地状态
-                val updatedTags = _uiState.value.allTags.filter { tagIds.contains(it.id) }
+                apiService.updateVideo(videoId, mapOf("title" to title, "description" to (description ?: "")))
                 _uiState.update { state ->
                     state.video?.let { v ->
-                        state.copy(video = v.copy(title = title, description = description, tags = updatedTags))
+                        state.copy(video = v.copy(title = title, description = description))
                     } ?: state
                 }
             } catch (e: Exception) {
-                // Ignore error
             }
         }
     }

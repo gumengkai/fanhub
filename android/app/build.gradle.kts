@@ -21,9 +21,19 @@ android {
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://192.168.31.40:11303\"")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("fanhub.keystore")
+            storePassword = "fanhub123"
+            keyAlias = "fanhub"
+            keyPassword = "fanhub123"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -102,6 +112,10 @@ dependencies {
 
     // Media3
     implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)  // HLS 流媒体支持
+    implementation(libs.media3.exoplayer.dash)  // DASH 流媒体支持
+    implementation(libs.media3.exoplayer.rtsp)  // RTSP 支持
+    implementation(libs.media3.datasource.okhttp)  // OkHttp 数据源支持
     implementation(libs.media3.ui)
     implementation(libs.media3.session)
 

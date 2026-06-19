@@ -1,8 +1,6 @@
 package com.fanhub.app.data.repository
 
 import com.fanhub.app.data.api.ApiService
-import com.fanhub.app.data.model.Tag
-import com.fanhub.app.data.model.TagsResponse
 import com.fanhub.app.data.model.Video
 import com.fanhub.app.data.model.VideoListResponse
 import javax.inject.Inject
@@ -14,7 +12,6 @@ class MediaRepository @Inject constructor(private val apiService: ApiService) {
     suspend fun getVideos(
         page: Int = 1,
         perPage: Int = 10,
-        tagId: Int? = null,
         sortBy: String = "created_at",
         order: String = "desc",
         favorite: Boolean? = null,
@@ -25,7 +22,6 @@ class MediaRepository @Inject constructor(private val apiService: ApiService) {
         apiService.getVideos(
             page = page,
             perPage = perPage,
-            tagId = tagId,
             sortBy = sortBy,
             order = order,
             favorite = favorite,
@@ -54,10 +50,6 @@ class MediaRepository @Inject constructor(private val apiService: ApiService) {
         Unit
     }
 
-    suspend fun getTags(): Result<List<Tag>> = runCatching {
-        apiService.getTags().items
-    }
-
     suspend fun getRelatedVideos(id: Int): Result<VideoListResponse> = runCatching {
         apiService.getRelatedVideos(id)
     }
@@ -69,16 +61,6 @@ class MediaRepository @Inject constructor(private val apiService: ApiService) {
         if (body.isNotEmpty()) {
             apiService.updateVideo(id, body)
         }
-        Unit
-    }
-
-    suspend fun addTagToVideo(videoId: Int, tagId: Int): Result<Unit> = runCatching {
-        apiService.addTagToVideo(videoId, mapOf("tag_id" to tagId))
-        Unit
-    }
-
-    suspend fun removeTagFromVideo(videoId: Int, tagId: Int): Result<Unit> = runCatching {
-        apiService.removeTagFromVideo(videoId, tagId)
         Unit
     }
 

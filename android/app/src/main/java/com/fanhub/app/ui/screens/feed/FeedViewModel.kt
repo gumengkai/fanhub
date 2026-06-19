@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fanhub.app.data.api.ApiService
 import com.fanhub.app.data.model.Video
-import com.fanhub.app.data.model.Tag
 import com.fanhub.app.data.repository.HistoryRepository
 import com.fanhub.app.player.PlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,16 +14,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class FeedUiState(
-    val allVideos: List<Video> = emptyList(),      // 所有视频（原始数据）
-    val playlist: List<Video> = emptyList(),       // 当前播放列表（筛选后）
+    val allVideos: List<Video> = emptyList(),
+    val playlist: List<Video> = emptyList(),
     val currentIndex: Int = 0,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isRandom: Boolean = false,                 // 随机模式
-    val filterType: String = "all",                // all/liked/favorite/unwatched/tag
-    val selectedTagId: Int? = null,                // 选中标签ID
-    val tags: List<Tag> = emptyList(),             // 标签列表
-    val watchedVideoIds: Set<Int> = emptySet()     // 已观看的视频ID集合
+    val isRandom: Boolean = false,
+    val filterType: String = "all",
+    val watchedVideoIds: Set<Int> = emptySet(),
+    val currentVideoRequiresExternalPlayer: Boolean = false
 )
 
 @HiltViewModel
@@ -39,24 +37,18 @@ class FeedViewModel @Inject constructor(
 
     private var isInitialized = false
 
-    /**
-     * 延迟初始化，在界面准备好后再加载数据
-     */
     fun initialize() {
         if (!isInitialized) {
             isInitialized = true
             loadAllVideos()
-            loadTags()
             loadWatchedVideos()
         }
     }
 
-    /** 获取所有视频（参考web端，先获取第一页知道总数，再获取全部） */
     private fun loadAllVideos() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                // 先获取第一页以知道总数
                 val firstResponse = apiService.getVideos(page = 1, perPage = 1)
                 val total = firstResponse.total
 
@@ -65,7 +57,6 @@ class FeedViewModel @Inject constructor(
                     return@launch
                 }
 
-                // 获取全部视频
                 val response = apiService.getVideos(page = 1, perPage = total)
                 val videos = response.items
 
@@ -77,23 +68,9 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    /** 加载标签列表 */
-    private fun loadTags() {
-        viewModelScope.launch {
-            try {
-                val response = apiService.getTags()
-                _uiState.update { it.copy(tags = response.items ?: emptyList()) }
-            } catch (e: Exception) {
-                // Ignore tag loading error
-            }
-        }
-    }
-
-    /** 应用筛选条件 */
     fun applyFilter() {
         val allVideos = _uiState.value.allVideos
         val filterType = _uiState.value.filterType
-        val selectedTagId = _uiState.value.selectedTagId
         val isRandom = _uiState.value.isRandom
         val watchedVideoIds = _uiState.value.watchedVideoIds
 
@@ -101,11 +78,6 @@ class FeedViewModel @Inject constructor(
             "liked" -> allVideos.filter { it.isLiked }
             "favorite" -> allVideos.filter { it.isFavorite }
             "unwatched" -> allVideos.filter { !watchedVideoIds.contains(it.id) }
-            "tag" -> if (selectedTagId != null) {
-                allVideos.filter { it.tags.any { tag -> tag.id == selectedTagId } }
-            } else {
-                allVideos
-            }
             else -> allVideos
         }
 
@@ -113,31 +85,22 @@ class FeedViewModel @Inject constructor(
         
         _uiState.update { it.copy(playlist = playlist, currentIndex = 0) }
 
-        // 播放第一个视频
         if (playlist.isNotEmpty()) {
-            playerManager.prepareAt(0, playlist)
+            val requiresExternal = playerManager.prepareAt(0, playlist)
+            _uiState.update { it.copy(currentVideoRequiresExternalPlayer = requiresExternal) }
         }
     }
 
-    /** 设置筛选类型 */
     fun setFilterType(type: String) {
         _uiState.update { it.copy(filterType = type) }
         applyFilter()
     }
 
-    /** 设置选中标签 */
-    fun setSelectedTag(tagId: Int?) {
-        _uiState.update { it.copy(selectedTagId = tagId) }
-        applyFilter()
-    }
-
-    /** 切换随机/顺序模式 */
     fun toggleRandomMode() {
         val state = _uiState.value
         val newRandom = !state.isRandom
         
         if (newRandom) {
-            // 开启随机：记住当前视频，打乱后保持播放
             val currentVideo = state.playlist.getOrNull(state.currentIndex)
             val shuffled = state.playlist.shuffled()
             val newIndex = if (currentVideo != null) {
@@ -146,270 +109,146 @@ class FeedViewModel @Inject constructor(
             
             _uiState.update { it.copy(isRandom = true, playlist = shuffled, currentIndex = newIndex) }
             if (shuffled.isNotEmpty()) {
-                playerManager.prepareAt(newIndex, shuffled)
+                val requiresExternal = playerManager.prepareAt(newIndex, shuffled)
+                _uiState.update { it.copy(currentVideoRequiresExternalPlayer = requiresExternal) }
             }
         } else {
-            // 关闭随机：恢复原始顺序，记住当前视频
             val currentVideo = state.playlist.getOrNull(state.currentIndex)
-            applyFilterInternal(keepCurrentVideo = currentVideo)
-        }
-    }
-
-    /** 内部筛选方法，可选择保持当前视频 */
-    private fun applyFilterInternal(keepCurrentVideo: Video? = null) {
-        val allVideos = _uiState.value.allVideos
-        val filterType = _uiState.value.filterType
-        val selectedTagId = _uiState.value.selectedTagId
-        val isRandom = _uiState.value.isRandom
-        val watchedVideoIds = _uiState.value.watchedVideoIds
-
-        val filtered = when (filterType) {
-            "liked" -> allVideos.filter { it.isLiked }
-            "favorite" -> allVideos.filter { it.isFavorite }
-            "unwatched" -> allVideos.filter { !watchedVideoIds.contains(it.id) }
-            "tag" -> if (selectedTagId != null) {
-                allVideos.filter { it.tags.any { tag -> tag.id == selectedTagId } }
-            } else {
-                allVideos
-            }
-            else -> allVideos
-        }
-
-        val playlist = if (isRandom && filtered.isNotEmpty()) filtered.shuffled() else filtered
-        
-        val newIndex = if (keepCurrentVideo != null && playlist.isNotEmpty()) {
-            playlist.indexOfFirst { it.id == keepCurrentVideo.id }.coerceAtLeast(0)
-        } else 0
-        
-        _uiState.update { it.copy(playlist = playlist, currentIndex = newIndex) }
-
-        if (playlist.isNotEmpty()) {
-            playerManager.prepareAt(newIndex, playlist)
-        }
-    }
-
-    /** 页面切换 settled */
-    fun onPageSettled(index: Int) {
-        val playlist = _uiState.value.playlist
-        val currentIndex = _uiState.value.currentIndex
-        if (index < 0 || index >= playlist.size) return
-        
-        // 只有页面真正改变时才更新
-        if (index != currentIndex) {
-            _uiState.update { it.copy(currentIndex = index) }
-            playerManager.prepareAt(index, playlist)
-        }
-    }
-
-    /** 下一个视频 */
-    fun nextVideo() {
-        val state = _uiState.value
-        val playlist = state.playlist
-        if (playlist.isEmpty()) return
-
-        val nextIndex = (state.currentIndex + 1) % playlist.size
-        _uiState.update { it.copy(currentIndex = nextIndex) }
-        playerManager.prepareAt(nextIndex, playlist)
-    }
-
-    /** 上一个视频 */
-    fun prevVideo() {
-        val state = _uiState.value
-        val playlist = state.playlist
-        if (playlist.isEmpty()) return
-
-        val prevIndex = (state.currentIndex - 1 + playlist.size) % playlist.size
-        _uiState.update { it.copy(currentIndex = prevIndex) }
-        playerManager.prepareAt(prevIndex, playlist)
-    }
-
-    /** 同步播放进度 */
-    fun syncProgress(videoId: Int, progress: Float) {
-        viewModelScope.launch {
-            val duration = playerManager.player.duration
-            val position = (progress * duration).toInt()
-            historyRepository.updateProgress(videoId, position, duration.toInt())
-            
-            // 标记为已观看（只要有进度就算观看过）
-            if (progress > 0.05f) {
-                _uiState.update { state ->
-                    state.copy(watchedVideoIds = state.watchedVideoIds + videoId)
+            val original = state.allVideos.filter { video ->
+                when (state.filterType) {
+                    "liked" -> video.isLiked
+                    "favorite" -> video.isFavorite
+                    "unwatched" -> !state.watchedVideoIds.contains(video.id)
+                    else -> true
                 }
             }
+            val newIndex = if (currentVideo != null) {
+                original.indexOfFirst { it.id == currentVideo.id }.coerceAtLeast(0)
+            } else 0
+            
+            _uiState.update { it.copy(isRandom = false, playlist = original, currentIndex = newIndex) }
+            if (original.isNotEmpty()) {
+                val requiresExternal = playerManager.prepareAt(newIndex, original)
+                _uiState.update { it.copy(currentVideoRequiresExternalPlayer = requiresExternal) }
+            }
         }
     }
-    
-    /** 加载观看历史 */
+
     private fun loadWatchedVideos() {
         viewModelScope.launch {
             try {
-                val historyResult = historyRepository.getHistory()
-                historyResult.onSuccess { response ->
-                    @Suppress("UNCHECKED_CAST")
-                    val items = response["items"] as? List<Map<String, Any>> ?: emptyList()
-                    val watchedIds = items.mapNotNull { 
-                        (it["video_id"] as? Number)?.toInt() 
-                    }.toSet()
-                    _uiState.update { it.copy(watchedVideoIds = watchedIds) }
-                }
+                val watchedIds = historyRepository.getAllWatchedVideoIds()
+                _uiState.update { it.copy(watchedVideoIds = watchedIds) }
             } catch (e: Exception) {
-                // Ignore error
             }
         }
     }
 
-    /** 喜欢/取消喜欢 */
     fun toggleLike(videoId: Int) {
         viewModelScope.launch {
             try {
-                val response = apiService.toggleLike(videoId)
-                if (response.isSuccessful) {
-                    val isLiked = (response.body()?.get("is_liked") as? Boolean) ?: false
-                    _uiState.update { state ->
-                        val updatedVideos = state.allVideos.map { video ->
-                            if (video.id == videoId) video.copy(isLiked = isLiked) else video
-                        }
-                        val updatedPlaylist = state.playlist.map { video ->
-                            if (video.id == videoId) video.copy(isLiked = isLiked) else video
-                        }
-                        state.copy(allVideos = updatedVideos, playlist = updatedPlaylist)
+                apiService.toggleLike(videoId)
+                _uiState.update { state ->
+                    val updatedAllVideos = state.allVideos.map { video ->
+                        if (video.id == videoId) video.copy(isLiked = !video.isLiked) else video
                     }
+                    val updatedPlaylist = state.playlist.map { video ->
+                        if (video.id == videoId) video.copy(isLiked = !video.isLiked) else video
+                    }
+                    state.copy(allVideos = updatedAllVideos, playlist = updatedPlaylist)
                 }
             } catch (e: Exception) {
-                // Ignore error
             }
         }
     }
 
-    /** 收藏/取消收藏 */
     fun toggleFavorite(videoId: Int) {
         viewModelScope.launch {
             try {
-                val response = apiService.toggleFavorite(videoId)
-                if (response.isSuccessful) {
-                    val isFavorite = (response.body()?.get("is_favorite") as? Boolean) ?: false
-                    _uiState.update { state ->
-                        val updatedVideos = state.allVideos.map { video ->
-                            if (video.id == videoId) video.copy(isFavorite = isFavorite) else video
-                        }
-                        val updatedPlaylist = state.playlist.map { video ->
-                            if (video.id == videoId) video.copy(isFavorite = isFavorite) else video
-                        }
-                        state.copy(allVideos = updatedVideos, playlist = updatedPlaylist)
+                apiService.toggleFavorite(videoId)
+                _uiState.update { state ->
+                    val updatedAllVideos = state.allVideos.map { video ->
+                        if (video.id == videoId) video.copy(isFavorite = !video.isFavorite) else video
                     }
+                    val updatedPlaylist = state.playlist.map { video ->
+                        if (video.id == videoId) video.copy(isFavorite = !video.isFavorite) else video
+                    }
+                    state.copy(allVideos = updatedAllVideos, playlist = updatedPlaylist)
                 }
             } catch (e: Exception) {
-                // Ignore error
             }
         }
     }
 
-    /** 删除视频 */
     fun deleteVideo(videoId: Int) {
         viewModelScope.launch {
             try {
-                apiService.deleteVideo(videoId)
-                _uiState.update { state ->
-                    val updatedAllVideos = state.allVideos.filter { it.id != videoId }
-                    val updatedPlaylist = state.playlist.filter { it.id != videoId }
-                    val newIndex = if (state.currentIndex >= updatedPlaylist.size) 0 else state.currentIndex
-                    state.copy(allVideos = updatedAllVideos, playlist = updatedPlaylist, currentIndex = newIndex)
-                }
-                // 播放下一个
-                val playlist = _uiState.value.playlist
-                if (playlist.isNotEmpty()) {
-                    playerManager.prepareAt(_uiState.value.currentIndex, playlist)
+                val response = apiService.deleteVideo(videoId)
+                if (response.isSuccessful) {
+                    _uiState.update { state ->
+                        val updatedAllVideos = state.allVideos.filter { it.id != videoId }
+                        val updatedPlaylist = state.playlist.filter { it.id != videoId }
+                        val newIndex = state.currentIndex.coerceIn(0, (updatedPlaylist.size - 1).coerceAtLeast(0))
+                        
+                        // 更新播放器状态
+                        val requiresExternal = if (updatedPlaylist.isNotEmpty() && newIndex < updatedPlaylist.size) {
+                            playerManager.prepareAt(newIndex, updatedPlaylist)
+                        } else false
+                        
+                        state.copy(
+                            allVideos = updatedAllVideos, 
+                            playlist = updatedPlaylist, 
+                            currentIndex = newIndex,
+                            currentVideoRequiresExternalPlayer = requiresExternal
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(error = "删除失败: ${response.code()}") }
                 }
             } catch (e: Exception) {
-                // Ignore error
+                _uiState.update { it.copy(error = "删除失败: ${e.message}") }
             }
         }
     }
 
-    /** 刷新数据 */
-    fun refresh() {
-        loadAllVideos()
+    fun onPageSettled(page: Int) {
+        val playlist = _uiState.value.playlist
+        var requiresExternal = false
+        if (page >= 0 && page < playlist.size) {
+            requiresExternal = playerManager.prepareAt(page, playlist)
+        }
+        _uiState.update { it.copy(currentIndex = page, currentVideoRequiresExternalPlayer = requiresExternal) }
     }
-
-    /** 更新视频信息（标题、描述、标签） */
-    fun updateVideoInfo(videoId: Int, title: String, description: String, tagIds: List<Int>) {
-        viewModelScope.launch {
-            try {
-                // 更新标题和描述
-                apiService.updateVideo(videoId, mapOf("title" to title, "description" to description))
-
-                // 获取当前视频的标签
-                val currentTags = apiService.getVideoTags(videoId).items.map { it.id }
-
-                // 移除不在新列表中的标签
-                for (tagId in currentTags) {
-                    if (!tagIds.contains(tagId)) {
-                        apiService.removeTagFromVideo(videoId, tagId)
-                    }
-                }
-
-                // 添加新标签
-                for (tagId in tagIds) {
-                    if (!currentTags.contains(tagId)) {
-                        apiService.addTagToVideo(videoId, mapOf("tag_id" to tagId))
-                    }
-                }
-
-                // 更新本地状态
-                _uiState.update { state ->
-                    val updatedTags = state.tags.filter { tagIds.contains(it.id) }
-                    val updatedAllVideos = state.allVideos.map { video ->
-                        if (video.id == videoId) {
-                            video.copy(title = title, description = description, tags = updatedTags)
-                        } else video
-                    }
-                    val updatedPlaylist = state.playlist.map { video ->
-                        if (video.id == videoId) {
-                            video.copy(title = title, description = description, tags = updatedTags)
-                        } else video
-                    }
-                    state.copy(allVideos = updatedAllVideos, playlist = updatedPlaylist)
-                }
-            } catch (e: Exception) {
-                // Ignore error
-            }
+    
+    /**
+     * 使用外部播放器播放当前视频（用于不支持的视频格式）
+     */
+    fun playWithExternalPlayer() {
+        val currentVideo = _uiState.value.playlist.getOrNull(_uiState.value.currentIndex)
+        if (currentVideo != null) {
+            playerManager.playWithExternalPlayer(currentVideo)
         }
     }
 
-    /** 只更新视频标签 */
-    fun updateVideoTags(videoId: Int, tagIds: List<Int>) {
+    fun nextVideo() {
+        val state = _uiState.value
+        if (state.currentIndex < state.playlist.size - 1) {
+            onPageSettled(state.currentIndex + 1)
+        }
+    }
+
+    fun prevVideo() {
+        val state = _uiState.value
+        if (state.currentIndex > 0) {
+            onPageSettled(state.currentIndex - 1)
+        }
+    }
+
+    fun syncProgress(videoId: Int, progress: Float) {
         viewModelScope.launch {
             try {
-                // 获取当前视频的标签
-                val currentTags = apiService.getVideoTags(videoId).items.map { it.id }
-
-                // 移除不在新列表中的标签
-                for (tagId in currentTags) {
-                    if (!tagIds.contains(tagId)) {
-                        apiService.removeTagFromVideo(videoId, tagId)
-                    }
-                }
-
-                // 添加新标签
-                for (tagId in tagIds) {
-                    if (!currentTags.contains(tagId)) {
-                        apiService.addTagToVideo(videoId, mapOf("tag_id" to tagId))
-                    }
-                }
-
-                // 更新本地状态
-                _uiState.update { state ->
-                    val updatedTags = state.tags.filter { tagIds.contains(it.id) }
-                    val updatedAllVideos = state.allVideos.map { video ->
-                        if (video.id == videoId) video.copy(tags = updatedTags) else video
-                    }
-                    val updatedPlaylist = state.playlist.map { video ->
-                        if (video.id == videoId) video.copy(tags = updatedTags) else video
-                    }
-                    state.copy(allVideos = updatedAllVideos, playlist = updatedPlaylist)
-                }
+                historyRepository.saveProgress(videoId, progress)
             } catch (e: Exception) {
-                // Ignore error
             }
         }
     }

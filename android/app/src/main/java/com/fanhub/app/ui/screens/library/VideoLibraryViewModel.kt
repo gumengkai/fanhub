@@ -70,12 +70,7 @@ class VideoLibraryViewModel @Inject constructor(
     }
 
     private fun loadTags() {
-        viewModelScope.launch {
-            mediaRepository.getTags()
-                .onSuccess { tags ->
-                    _uiState.update { it.copy(tags = tags) }
-                }
-        }
+        // Tags feature removed - do nothing
     }
 
     fun selectTag(tagId: Int?) {
@@ -189,7 +184,6 @@ class VideoLibraryViewModel @Inject constructor(
             mediaRepository.getVideos(
                 page = page,
                 perPage = 20,
-                tagId = state.selectedTagId,
                 sortBy = state.sortOption.sortBy,
                 order = state.sortOption.order,
                 favorite = favorite,

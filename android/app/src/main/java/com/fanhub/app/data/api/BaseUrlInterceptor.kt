@@ -27,7 +27,7 @@ class BaseUrlInterceptor @Inject constructor() : Interceptor {
         val scheme = if (base.startsWith("https")) "https" else "http"
         val hostPort = base.removePrefix("https://").removePrefix("http://")
         val host = hostPort.substringBefore(":")
-        val port = hostPort.substringAfter(":", "3001").toIntOrNull() ?: 3001
+        val port = hostPort.substringAfter(":", "11303").toIntOrNull() ?: 11303
 
         val newUrl = original.url.newBuilder()
             .scheme(scheme)

@@ -21,10 +21,10 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -47,7 +47,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -83,6 +82,9 @@ fun FeedScreen(
 
     // 全屏状态
     var isFullscreen by remember { mutableStateOf(false) }
+    
+    // UI显示状态（控制顶部栏和底部进度条）
+    var showUi by remember { mutableStateOf(false) }
 
     // Hide system bars for immersive experience
     SideEffect {
@@ -108,11 +110,6 @@ fun FeedScreen(
             viewModel.onPageSettled(page)
         }
     }
-
-    // Edit dialog state - 只包含标签选择
-    var showEditDialog by remember { mutableStateOf(false) }
-    var editingVideo by remember { mutableStateOf<Video?>(null) }
-    val selectedTagIds = remember { mutableStateListOf<Int>() }
 
     // Delete confirmation dialog
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -163,6 +160,47 @@ fun FeedScreen(
                 }
             }
         } else {
+            // 如果需要外部播放器，显示提示
+            if (uiState.currentVideoRequiresExternalPlayer) {
+                val currentVideo = uiState.playlist.getOrNull(uiState.currentIndex)
+                if (currentVideo != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = PrimaryPink,
+                            modifier = Modifier.size(80.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "此视频格式 (${currentVideo.format ?: "未知"}) 需要使用系统播放器",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = currentVideo.title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { viewModel.playWithExternalPlayer() },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink)
+                        ) {
+                            Text("使用系统播放器")
+                        }
+                    }
+                }
+            }
+            
             VerticalPager(
                 state = pagerState,
                 beyondViewportPageCount = 2,
@@ -170,6 +208,11 @@ fun FeedScreen(
             ) { page ->
                 val video = uiState.playlist[page]
                 val isActive = pagerState.settledPage == page
+                
+                // 如果当前视频需要外部播放器，不显示 VideoFeedItem
+                if (uiState.currentVideoRequiresExternalPlayer && uiState.currentIndex == page) {
+                    return@VerticalPager
+                }
 
                 VideoFeedItem(
                     video = video,
@@ -177,6 +220,8 @@ fun FeedScreen(
                     player = viewModel.playerManager.player,
                     serverUrl = viewModel.playerManager.getServerUrl(),
                     isRandom = uiState.isRandom,
+                    showControls = showUi,
+                    onToggleControls = { showUi = !showUi },
                     onLike = { viewModel.toggleLike(video.id) },
                     onFavorite = { viewModel.toggleFavorite(video.id) },
                     onProgressSync = { progress -> viewModel.syncProgress(video.id, progress) },
@@ -184,23 +229,22 @@ fun FeedScreen(
                         videoToDelete = video
                         showDeleteDialog = true
                     },
-                    onEdit = {
-                        editingVideo = video
-                        selectedTagIds.clear()
-                        selectedTagIds.addAll(video.tags.map { it.id })
-                        showEditDialog = true
-                    },
                     onNext = { viewModel.nextVideo() },
                     onPrev = { viewModel.prevVideo() },
                     onFullscreen = { isFullscreen = true }
                 )
             }
 
-            // 顶部控制栏 - 重构筛选
+            // 顶部控制栏 - 点击才显示
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showUi,
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter)
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.TopCenter)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 // 第一行：返回 + 计数器
@@ -233,7 +277,7 @@ fun FeedScreen(
                     }
                 }
 
-                // 第二行：筛选器（两个下拉）
+                // 第二行：筛选器
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -241,7 +285,7 @@ fun FeedScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 筛选1：全部/收藏/喜欢
+                    // 筛选：全部/收藏/喜欢/未观看
                     var filterExpanded by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(
                         expanded = filterExpanded,
@@ -326,59 +370,13 @@ fun FeedScreen(
                         }
                     }
 
-                    // 筛选2：标签下拉
-                    if (uiState.tags.isNotEmpty()) {
-                        var tagExpanded by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = tagExpanded,
-                            onExpandedChange = { tagExpanded = it }
-                        ) {
-                            FilterChip(
-                                selected = uiState.selectedTagId != null,
-                                onClick = { tagExpanded = true },
-                                label = { 
-                                    Text(
-                                        uiState.tags.find { it.id == uiState.selectedTagId }?.name ?: "标签",
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Tag,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = PrimaryPink,
-                                    containerColor = Color.Black.copy(alpha = 0.5f)
-                                ),
-                                modifier = Modifier.menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = tagExpanded,
-                                onDismissRequest = { tagExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("全部标签") },
-                                    onClick = { viewModel.setSelectedTag(null); tagExpanded = false }
-                                )
-                                uiState.tags.forEach { tag ->
-                                    DropdownMenuItem(
-                                        text = { Text(tag.name) },
-                                        onClick = { viewModel.setSelectedTag(tag.id); tagExpanded = false }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
                     // 随机播放按钮
                     RandomPlayToggle(
                         isRandom = uiState.isRandom,
                         onToggle = { viewModel.toggleRandomMode() }
                     )
                 }
+            }
             }
         }
     }
@@ -411,83 +409,6 @@ fun FeedScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false; videoToDelete = null }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
-    // Edit video info dialog - 只包含标签选择
-    if (showEditDialog && editingVideo != null) {
-        AlertDialog(
-            onDismissRequest = { showEditDialog = false; editingVideo = null },
-            title = { Text("编辑标签") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "选择标签",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary
-                    )
-                    // 标签列表
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        uiState.tags.forEach { tag ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (selectedTagIds.contains(tag.id)) {
-                                            selectedTagIds.remove(tag.id)
-                                        } else {
-                                            selectedTagIds.add(tag.id)
-                                        }
-                                    }
-                                    .background(
-                                        if (selectedTagIds.contains(tag.id)) PrimaryPink.copy(alpha = 0.2f)
-                                        else Color.Transparent,
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Tag,
-                                    contentDescription = null,
-                                    tint = if (selectedTagIds.contains(tag.id)) PrimaryPink else TextSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    tag.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (selectedTagIds.contains(tag.id)) PrimaryPink else TextSecondary
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        editingVideo?.let { video ->
-                            viewModel.updateVideoTags(video.id, selectedTagIds.toList())
-                        }
-                        showEditDialog = false
-                        editingVideo = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink)
-                ) {
-                    Text("保存")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditDialog = false; editingVideo = null }) {
                     Text("取消")
                 }
             }

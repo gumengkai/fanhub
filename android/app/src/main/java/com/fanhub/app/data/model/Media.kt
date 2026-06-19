@@ -16,9 +16,10 @@ data class Video(
     @SerializedName("is_liked")        val isLiked: Boolean = false,
     @SerializedName("description")     val description: String? = null,
     @SerializedName("view_count")      val viewCount: Int = 0,
-    @SerializedName("tags")            val tags: List<Tag> = emptyList(),
     @SerializedName("created_at")      val createdAt: String? = null,
-    @SerializedName("updated_at")      val updatedAt: String? = null
+    @SerializedName("updated_at")      val updatedAt: String? = null,
+    @SerializedName("format")          val format: String? = null,
+    @SerializedName("requires_external_player") val requiresExternalPlayer: Boolean = false
 ) {
     val resolution: String?
         get() = if (width != null && height != null) "${width}x${height}" else null
@@ -39,13 +40,6 @@ data class Video(
             return if (gb >= 1) "${gb}GB" else "${mb}MB"
         }
 }
-
-data class Tag(
-    @SerializedName("id")         val id: Int,
-    @SerializedName("name")       val name: String,
-    @SerializedName("color")      val color: String = "#fb7299",
-    @SerializedName("video_count") val videoCount: Int = 0
-)
 
 data class VideoListResponse(
     @SerializedName("items")       val items: List<Video>,
@@ -75,21 +69,21 @@ fun parseVideoResponse(json: Map<String, Any>): Video {
         isLiked = json["is_liked"] as? Boolean ?: false,
         description = json["description"] as? String,
         viewCount = (json["view_count"] as? Number)?.toInt() ?: 0,
-        tags = (json["tags"] as? List<Map<String, Any>>)?.map { tagMap ->
-            Tag(
-                id = (tagMap["id"] as? Number)?.toInt() ?: 0,
-                name = tagMap["name"] as? String ?: "",
-                color = tagMap["color"] as? String ?: "#fb7299",
-                videoCount = (tagMap["video_count"] as? Number)?.toInt() ?: 0
-            )
-        } ?: emptyList(),
         createdAt = json["created_at"] as? String,
         updatedAt = json["updated_at"] as? String
     )
 }
 
+// Tag class kept for backward compatibility (always empty)
+data class Tag(
+    val id: Int = 0,
+    val name: String = "",
+    val color: String = "#fb7299",
+    val videoCount: Int = 0
+)
+
 data class TagsResponse(
-    @SerializedName("items") val items: List<Tag> = emptyList()
+    val items: List<Tag> = emptyList()
 )
 
 data class HistoryRequest(
@@ -99,7 +93,6 @@ data class HistoryRequest(
 )
 
 data class FavoriteRequest(
-    @SerializedName("tag_id") val tagId: Int? = null,
     @SerializedName("video_id") val videoId: Int? = null,
     @SerializedName("image_id") val imageId: Int? = null
 )
@@ -118,7 +111,6 @@ data class Media(
     val description: String? = null,
     val sourceId: Int? = null,
     val createTime: String? = null,
-    val tags: List<Tag> = emptyList(),
     val isFavorite: Boolean = false,
     val isLiked: Boolean = false
 ) {
@@ -137,7 +129,6 @@ data class Media(
                 description = video.description,
                 sourceId = video.sourceId,
                 createTime = video.createdAt,
-                tags = video.tags,
                 isFavorite = video.isFavorite,
                 isLiked = video.isLiked
             )

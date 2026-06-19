@@ -2,9 +2,9 @@ package com.fanhub.app.data.api
 
 import com.fanhub.app.data.model.FavoriteRequest
 import com.fanhub.app.data.model.HistoryRequest
+import com.fanhub.app.data.model.TagsResponse
 import com.fanhub.app.data.model.VideoListResponse
 import com.fanhub.app.data.model.Video
-import com.fanhub.app.data.model.TagsResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -92,6 +92,8 @@ interface ApiService {
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20,
         @Query("search") search: String = "",
+        @Query("sort_by") sortBy: String = "created_at",
+        @Query("order") order: String = "desc",
         @Query("favorite") favorite: Boolean? = null,
         @Query("liked") liked: Boolean? = null
     ): Response<Map<String, Any>>

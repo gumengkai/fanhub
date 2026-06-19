@@ -40,7 +40,7 @@ import com.fanhub.app.ui.screens.library.VideoLibraryScreen
 import com.fanhub.app.ui.screens.onboarding.OnboardingScreen
 import com.fanhub.app.ui.screens.search.SearchScreen
 import com.fanhub.app.ui.screens.settings.SettingsScreen
-import com.fanhub.app.ui.screens.tags.TagBrowserScreen
+
 import com.fanhub.app.ui.theme.BackgroundSurface
 import com.fanhub.app.ui.theme.BorderColor
 import com.fanhub.app.ui.theme.PrimaryPink
@@ -153,22 +153,11 @@ fun AppNavGraph(
                     onNavigateToDetail = { id -> navController.navigate(Screen.MediaDetail.createRoute(id)) }
                 )
             }
-            composable(
-                route = Screen.LibraryWithTag.route,
-                arguments = listOf(navArgument("tagId") { type = NavType.IntType })
-            ) { backStackEntry ->
-                val tagId = backStackEntry.arguments?.getInt("tagId")
-                VideoLibraryScreen(
-                    serverUrl = serverUrl,
-                    initialTagId = tagId,
-                    onNavigateToDetail = { id -> navController.navigate(Screen.MediaDetail.createRoute(id)) }
-                )
-            }
+
             composable(Screen.Profile.route) {
                 ProfileScreen(
                     onNavigateToDetail = { id -> navController.navigate(Screen.MediaDetail.createRoute(id)) },
-                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                    onNavigateToLibraryWithTag = { tagId -> navController.navigate(Screen.LibraryWithTag.createRoute(tagId)) }
+                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
                 )
             }
             composable(Screen.Favorites.route) {
@@ -193,13 +182,7 @@ fun AppNavGraph(
                     onNavigateToDetail = { id -> navController.navigate(Screen.MediaDetail.createRoute(id)) }
                 )
             }
-            composable(Screen.Tags.route) {
-                TagBrowserScreen(
-                    onTagClick = { tag ->
-                        navController.navigate(Screen.Library.route + "?tag=$tag")
-                    }
-                )
-            }
+
             composable(Screen.Search.route) {
                 SearchScreen(
                     serverUrl = serverUrl,

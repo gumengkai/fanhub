@@ -85,11 +85,12 @@ fun VideoFeedItem(
     player: ExoPlayer,
     serverUrl: String,
     isRandom: Boolean = false,
+    showControls: Boolean = false,
+    onToggleControls: () -> Unit = {},
     onLike: () -> Unit = {},
     onFavorite: () -> Unit = {},
     onProgressSync: (Float) -> Unit = {},
     onDelete: () -> Unit = {},
-    onEdit: () -> Unit = {},
     onNext: () -> Unit = {},
     onPrev: () -> Unit = {},
     onFullscreen: () -> Unit = {},  // 全屏回调
@@ -97,7 +98,6 @@ fun VideoFeedItem(
 ) {
     var progress by remember { mutableFloatStateOf(0f) }
     var showLikeHeart by remember { mutableStateOf(false) }
-    var showControls by remember { mutableStateOf(true) }
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
     var isDraggingProgress by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
@@ -105,8 +105,6 @@ fun VideoFeedItem(
     var duration by remember { mutableIntStateOf(0) }
 
     val context = LocalContext.current
-    // val activity = context as? Activity
-    // val systemUiController = rememberSystemUiController()
 
     // Sync progress every 5s when active
     LaunchedEffect(isActive) {
@@ -139,13 +137,6 @@ fun VideoFeedItem(
         }
     }
 
-    // Auto hide controls after 3s
-    LaunchedEffect(isActive, showControls) {
-        if (!isActive || !showControls) return@LaunchedEffect
-        delay(3000)
-        showControls = false
-    }
-
     // Auto play next when video ends (随机模式生效)
     LaunchedEffect(isActive) {
         if (!isActive) return@LaunchedEffect
@@ -162,23 +153,27 @@ fun VideoFeedItem(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+    ) {
+        // Video or thumbnail with gesture handling
+        val videoModifier = Modifier
+            .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = { showControls = !showControls },
+                    onTap = { onToggleControls() },
                     onDoubleTap = {
                         showLikeHeart = true
                         onLike()
                     }
                 )
             }
-    ) {
-        // Video or thumbnail
+        
         if (isActive) {
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         this.player = player
                         useController = false
+                        // 使用 FIT 模式确保视频完整显示，不裁剪画面
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -186,15 +181,16 @@ fun VideoFeedItem(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = videoModifier
             )
         } else {
             val thumbUrl = "${serverUrl.trimEnd('/')}/api/videos/${video.id}/thumbnail"
             AsyncImage(
                 model = thumbUrl,
                 contentDescription = video.title,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
+                // 缩略图也使用 Crop 模式填充
+                contentScale = ContentScale.Crop,
+                modifier = videoModifier
             )
         }
 
@@ -220,11 +216,16 @@ fun VideoFeedItem(
             }
         }
 
-        // Bottom gradient overlay
+        // Bottom gradient overlay - 只在显示控制时显示
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
@@ -253,25 +254,12 @@ fun VideoFeedItem(
                         maxLines = 2
                     )
                 }
-                if (video.tags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        video.tags.take(3).forEach { tag ->
-                            SuggestionChip(
-                                onClick = {},
-                                label = { Text(tag.name, style = MaterialTheme.typography.labelSmall) },
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = PrimaryPink20
-                                ),
-                                border = null
-                            )
-                        }
-                    }
-                }
+
             }
         }
+        }
 
-        // Right-side action buttons (抖音风格)
+        // Right-side action buttons (抖音风格) - 始终显示
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -303,14 +291,6 @@ fun VideoFeedItem(
                 onClick = onFullscreen
             )
 
-            // 编辑标签
-            ActionButton(
-                icon = Icons.Default.Edit,
-                label = "编辑",
-                tint = TextPrimary,
-                onClick = onEdit
-            )
-
             // 删除
             ActionButton(
                 icon = Icons.Default.Delete,
@@ -320,11 +300,16 @@ fun VideoFeedItem(
             )
         }
 
-        // 抖音风格底部进度条 + 倍速控制
+        // 抖音风格底部进度条 + 倍速控制 - 只在显示控制时显示
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
                 .padding(bottom = 60.dp)  // 避开右侧按钮区域
         ) {
             // 拖动时显示时间气泡
@@ -397,6 +382,7 @@ fun VideoFeedItem(
                     )
                 }
             }
+        }
         }
 
         // Heart animation overlay (双击动画)

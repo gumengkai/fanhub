@@ -5,13 +5,9 @@ sealed class Screen(val route: String) {
     object Home           : Screen("home")           // 首页推荐
     object Feed           : Screen("feed")           // 短视频流
     object Library        : Screen("library")        // 视频库
-    object LibraryWithTag : Screen("library?tagId={tagId}") {
-        fun createRoute(tagId: Int) = "library?tagId=$tagId"
-    }
     object Favorites      : Screen("favorites")      // 收藏列表（二级页面）
     object Profile        : Screen("profile")        // 个人中心
     object History        : Screen("history")
-    object Tags           : Screen("tags")
     object Search         : Screen("search")
     object Settings       : Screen("settings")
 
